@@ -29,14 +29,16 @@
             },
             fontFamily: { 
               'sans': ['Lexend Deca', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', "Segoe UI", 'Roboto', "Helvetica Neue", 'Arial', "Noto Sans", 'sans-serif', "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"],
-              'lexend': ['Lexend Deca', 'sans-serif'] // Specific utility if needed
+              'lexend': ['Lexend Deca', 'sans-serif']
             }
           }
         }
       }
     </script>
 </head>
-<body class="bg-nova-gray-light font-sans text-nova-gray-dark"> <div id="app-container" class="container mx-auto p-4 min-h-screen flex flex-col">
+<body class="bg-nova-gray-light font-sans text-nova-gray-dark">
+
+    <div id="app-container" class="container mx-auto p-4 min-h-screen flex flex-col">
         <header class="bg-nova-green text-white p-6 shadow-md rounded-lg mb-8">
             <h1 class="text-3xl font-bold text-center">SINU - Sistema de Inventario de Nova Urbano</h1>
         </header>
@@ -48,7 +50,7 @@
                     <p class="text-center text-nova-gray">Cargando formulario...</p>
                 </div>
                  <div id="registration-area" class="mt-4 text-center">
-                    </div>
+                 </div>
             </section>
 
             <section id="dashboard-section" class="hidden">
@@ -69,7 +71,7 @@
                 </div>
 
                 <div id="inventory-section" class="hidden bg-white p-6 rounded-lg shadow-lg">
-                     <h3 class="text-xl font-semibold text-nova-green-dark mb-4">Inventario de: <span id="selected-site-name" class="text-nova-green"></span></h3>
+                    <h3 class="text-xl font-semibold text-nova-green-dark mb-4">Inventario de: <span id="selected-site-name" class="text-nova-green"></span></h3>
                     <button id="back-to-sites-button" class="mb-4 bg-nova-gray hover:bg-nova-gray-dark text-white py-2 px-4 rounded text-sm">← Volver a Obras</button>
                     <div id="inventory-list" class="mb-4">
                     </div>
