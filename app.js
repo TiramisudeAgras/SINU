@@ -21,7 +21,7 @@ const firebaseConfig = {
     const db = firebase.firestore();
     // -- END: Firebase Configuration --
 
-    let currentUserRole = null;
+    let currentUserRole = null; // Stores the role of the logged-in user
 
     // --- DOM Element References ---
     const authSection = document.getElementById('auth-section');
@@ -40,6 +40,8 @@ const firebaseConfig = {
     const inventorySection = document.getElementById('inventory-section');
     const selectedSiteNameSpan = document.getElementById('selected-site-name');
     const backToSitesButton = document.getElementById('back-to-sites-button');
+    const inventoryListContainer = document.getElementById('inventory-list');
+    const addItemFormContainer = document.getElementById('add-item-form-container');
 
 
     // --- Initial Page Setup ---
@@ -53,18 +55,27 @@ const firebaseConfig = {
         dashboardSection.classList.add('hidden');
     }
 
-    function showDashboardSection() {
-        authSection.classList.add('hidden');
-        dashboardSection.classList.remove('hidden');
+    function showSitesView() { // New function to specifically show sites view
         sitesSection.classList.remove('hidden');
         inventorySection.classList.add('hidden');
+        if (selectedSiteNameSpan) selectedSiteNameSpan.textContent = '';
+        if (inventoryListContainer) inventoryListContainer.innerHTML = '';
+        if (addItemFormContainer) addItemFormContainer.innerHTML = '';
+        renderAddSiteButton(); // Ensure correct button state for adding sites
     }
+    
+    function showDashboardSection() { // Modified to call showSitesView by default
+        authSection.classList.add('hidden');
+        dashboardSection.classList.remove('hidden');
+        showSitesView(); // Default to sites view
+    }
+
 
     // --- Authentication State Observer ---
     auth.onAuthStateChanged(async user => {
         if (user) {
             console.log("User signed in:", user.uid, user.email);
-            currentUserRole = null;
+            currentUserRole = null; 
 
             try {
                 const userDocRef = db.collection("users").doc(user.uid);
@@ -75,13 +86,18 @@ const firebaseConfig = {
                     currentUserRole = (userData.roles && userData.roles.length > 0) ? userData.roles[0] : 'espectador';
                     console.log("User is approved. Role:", currentUserRole);
                     
-                    if(dashboardTitle) dashboardTitle.textContent = `Panel de ${user.email || 'Usuario'} (${currentUserRole})`;
-                    showDashboardSection();
+                    // Update dashboard title with user's name
+                    const userName = (userData.nombre && userData.apellidos) 
+                                     ? `${userData.nombre} ${userData.apellidos}` 
+                                     : user.email || 'Usuario'; // Fallback to email or generic "Usuario"
+                    if(dashboardTitle) dashboardTitle.textContent = `Panel de ${userName} (${currentUserRole})`;
+                    
+                    showDashboardSection(); // This will now default to sites view
                     loadConstructionSites();
-                    renderAddSiteButton();
+                    // renderAddSiteButton(); // This is now called by showSitesView or when returning to it
                 } else {
                     console.log("User is NOT approved or profile doesn't exist yet.");
-                    currentUserRole = null;
+                    currentUserRole = null; 
                     showAuthSection(); 
                     if(authTitle) authTitle.textContent = "Cuenta Pendiente de Aprobación";
                     if(loginFormContainer) {
@@ -195,12 +211,13 @@ const firebaseConfig = {
         }
     }
 
-    // --- Render Signup Form ---
+    // --- Render Signup Form (with example text and consent) ---
     function renderSignupForm() {
         if (!loginFormContainer) return;
         if(authTitle) authTitle.textContent = 'Crear Nueva Cuenta';
         loginFormContainer.innerHTML = `
-            <form id="signup-form" class="space-y-3"> <div>
+            <form id="signup-form" class="space-y-3">
+                <div>
                     <label for="signup-nombre" class="block text-sm font-medium text-nova-gray-dark">Nombre(s)</label>
                     <input type="text" id="signup-nombre" name="nombre" required autocomplete="given-name"
                            class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
@@ -270,7 +287,6 @@ const firebaseConfig = {
                 });
             }
         }
-
         const signupForm = document.getElementById('signup-form');
         if (signupForm) {
             signupForm.addEventListener('submit', handleSignupSubmit);
@@ -351,6 +367,7 @@ const firebaseConfig = {
 
     // --- Helper for Firebase Auth Error Messages ---
     function getFirebaseAuthErrorMessage(error) {
+        // (Same as before)
         switch (error.code) {
             case 'auth/invalid-email': return 'El formato del correo electrónico no es válido.';
             case 'auth/user-disabled': return 'Este usuario ha sido deshabilitado.';
@@ -415,7 +432,6 @@ const firebaseConfig = {
                 <p id="add-site-error" class="mt-2 text-center text-sm text-red-600"></p>
             </form>
         `;
-
         const addSiteForm = document.getElementById('add-site-form');
         const cancelAddSiteButton = document.getElementById('cancel-add-site');
         if (addSiteForm) addSiteForm.addEventListener('submit', handleAddSiteSubmit);
@@ -498,9 +514,8 @@ const firebaseConfig = {
             document.querySelectorAll('#sites-list li').forEach(item => {
                 item.addEventListener('click', () => {
                     const siteId = item.dataset.siteId;
-                    const siteName = item.dataset.siteName;
-                    console.log(`Site clicked: ID=${siteId}, Name=${siteName}`);
-                    alert(`Has hecho clic en la obra: ${siteName} (ID: ${siteId}). La funcionalidad de inventario vendrá pronto.`);
+                    const siteName = item.dataset.siteName; // This is the escaped name
+                    showInventoryForSite(siteId, siteName);
                 });
             });
         } catch (error) {
@@ -508,4 +523,45 @@ const firebaseConfig = {
             sitesListContainer.innerHTML = `<p class="text-red-500 p-4">Error al cargar las obras: ${error.message}. Verifique los índices de Firestore si el error lo sugiere.</p>`;
         }
     }
+
+    // --- Inventory UI Transition and Placeholder Functions ---
+    function showInventoryForSite(siteId, siteName) {
+        console.log(`Attempting to show inventory for site: ${siteName} (ID: ${siteId})`);
+        if (sitesSection) sitesSection.classList.add('hidden');
+        if (inventorySection) inventorySection.classList.remove('hidden');
+        if (selectedSiteNameSpan) selectedSiteNameSpan.textContent = siteName; // Use the (potentially escaped) siteName
+
+        loadInventoryItems(siteId, siteName); 
+        renderAddInventoryItemButton(siteId, siteName);
+    }
+
+    if (backToSitesButton) {
+        backToSitesButton.addEventListener('click', () => {
+            if (inventorySection) inventorySection.classList.add('hidden');
+            if (sitesSection) sitesSection.classList.remove('hidden');
+            if (selectedSiteNameSpan) selectedSiteNameSpan.textContent = '';
+            if (inventoryListContainer) inventoryListContainer.innerHTML = '';
+            if (addItemFormContainer) addItemFormContainer.innerHTML = '';
+            renderAddSiteButton(); 
+        });
+    }
+
+    async function loadInventoryItems(siteId, siteName) {
+        console.log(`Placeholder: loadInventoryItems called for siteId: ${siteId}, siteName: ${siteName}`);
+        if (inventoryListContainer) {
+            inventoryListContainer.innerHTML = `<p class="text-nova-gray p-4">Cargando inventario para ${siteName}...</p>`;
+        }
+        // Actual loading logic will go here in the next step
+    }
+
+    function renderAddInventoryItemButton(siteId, siteName) {
+        console.log(`Placeholder: renderAddInventoryItemButton called for siteId: ${siteId}`);
+        if (addItemFormContainer && currentUserRole === 'oficina') {
+            addItemFormContainer.innerHTML = `<button id="show-add-item-form-btn" class="mb-4 bg-nova-green hover:bg-nova-green-dark text-white font-bold py-2 px-4 rounded transition-colors duration-150">+ Añadir Ítem de Inventario</button>`;
+            // We'll add event listener for this button later to call renderAddInventoryItemForm
+        } else if (addItemFormContainer) {
+            addItemFormContainer.innerHTML = ''; // Clear for non-oficina roles or if container is missing role check
+        }
+    }
+
 }); // End DOMContentLoaded
