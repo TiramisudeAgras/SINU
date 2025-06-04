@@ -1122,7 +1122,7 @@ async function handleTransferItemSubmit(event, itemId, sourceItemData, sourceSit
                 toSiteId: destinationSiteId,
                 toSiteName: destinationSiteName,
                 reason: reason || "N/A",
-                notes: `Transferencia de ${quantityToTransfer} <span class="math-inline">\{sourceItemData\.unit \|\| ''\} de "</span>{sourceItemData.itemName}" desde "<span class="math-inline">\{sourceSiteName\}" hacia "</span>{destinationSiteName}".`
+                notes: `Transferencia de ${quantityToTransfer} ${sourceItemData.unit || ''} de "${sourceItemData.itemName}" desde "${sourceSiteName}" hacia "${destinationSiteName}".`
             }
         });
 
@@ -1157,7 +1157,7 @@ async function handleTransferItemSubmit(event, itemId, sourceItemData, sourceSit
                 fromSiteId: sourceSiteId,
                 fromSiteName: sourceSiteName,
                 reason: reason || "N/A",
-                notes: `Recepción de ${quantityToTransfer} <span class="math-inline">\{sourceItemData\.unit \|\| ''\} de "</span>{sourceItemData.itemName}" desde "${sourceSiteName}".`
+                notes: `Recepción de ${quantityToTransfer} ${sourceItemData.unit || ''} de "${sourceItemData.itemName}" desde "${sourceSiteName}".`
             }
         });
 
