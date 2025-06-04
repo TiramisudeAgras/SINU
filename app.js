@@ -724,7 +724,6 @@ async function renderTransferItemForm(itemId, itemData, sourceSiteId, sourceSite
     if(transferItemCurrentQuantityInput) transferItemCurrentQuantityInput.value = itemData.quantity;
     if(transferSourceItemDataJsonInput) transferSourceItemDataJsonInput.value = JSON.stringify(itemData);
 
-
     // Display item info
     const escapedItemName = itemData.itemName ? itemData.itemName.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : 'Ítem Desconocido';
     if(transferItemNameDisplay) transferItemNameDisplay.textContent = `Ítem: ${escapedItemName}`;
@@ -738,20 +737,20 @@ async function renderTransferItemForm(itemId, itemData, sourceSiteId, sourceSite
     const errorElement = document.getElementById('transfer-item-error');
 
     if(quantityToTransferEl) quantityToTransferEl.value = '';
-    if(quantityToTransferEl) quantityToTransferEl.max = itemData.quantity; // Set max based on current quantity
-    if(destinationSiteEl) destinationSiteEl.innerHTML = '<option value="">Cargando destinos...</option>'; // Clear previous options
+    if(quantityToTransferEl) quantityToTransferEl.max = itemData.quantity;
+    if(destinationSiteEl) destinationSiteEl.innerHTML = '<option value="">Cargando destinos...</option>';
     if(transferReasonEl) transferReasonEl.value = '';
     if(errorElement) errorElement.textContent = '';
 
-    // Populate destination sites dropdown
+    // --- Load sites from Firestore and populate dropdown ---
+    let optionsHTML = '<option value="">Seleccione obra de destino</option>';
     try {
-        const sitesSnapshot = await db.collection("constructionSites").orderBy("name", "asc").get();
-        let optionsHTML = '<option value="">Seleccione obra de destino...</option>';
+        const sitesSnapshot = await db.collection("constructionSites").orderBy("createdAt", "desc").get();
         sitesSnapshot.forEach(doc => {
             if (doc.id !== sourceSiteId) { // Exclude the source site
                 const site = doc.data();
                 const escapedOptionSiteName = site.name.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-                optionsHTML += `<option value="<span class="math-inline">\{doc\.id\}"\></span>{escapedOptionSiteName}</option>`;
+                optionsHTML += `<option value="${doc.id}">${escapedOptionSiteName}</option>`;
             }
         });
         if(destinationSiteEl) destinationSiteEl.innerHTML = optionsHTML;
