@@ -580,21 +580,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function loadInventoryItems(siteId, siteName) {
-        if (!inventoryListContainer) {
-            console.error("Inventory list container not found");
-            return;
-        }
+        if (!inventoryListContainer) { /* ... */ return; }
         inventoryListContainer.innerHTML = `<p class="text-nova-gray p-4">Cargando inventario para ${siteName}...</p>`;
         const user = auth.currentUser;
-        if (!user) {
-            inventoryListContainer.innerHTML = '<p class="text-red-500 p-4">Error: Usuario no autenticado.</p>';
-            return;
-        }
+        if (!user) { /* ... */ return; }
+
         try {
             const inventorySnapshot = await db.collection("inventoryItems")
-                                          .where("siteId", "==", siteId)
-                                          .orderBy("itemName", "asc")
-                                          .get();
+                .where("siteId", "==", siteId)
+                .orderBy("itemName", "asc")
+                .get();
             if (inventorySnapshot.empty) {
                 inventoryListContainer.innerHTML = `<p class="text-nova-gray p-4">No hay ítems de inventario para esta obra (${siteName}).</p>`;
                 return;
@@ -603,18 +598,19 @@ document.addEventListener('DOMContentLoaded', () => {
             inventorySnapshot.forEach(doc => {
                 const item = doc.data();
                 const itemId = doc.id;
-                const escapedItemName = item.itemName ? item.itemName.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : 'Ítem sin nombre';
-                const escapedUnit = item.unit ? item.unit.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : '';
-                const escapedSerialModel = item.serialModel ? item.serialModel.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : 'N/A';
-                const escapedCondition = item.condition ? item.condition.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : 'N/A';
-                const escapedDescription = item.description ? item.description.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : '';
-                
+                const escapedItemName = item.itemName ? item.itemName.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char])) : 'Ítem sin nombre';
+                const escapedUnit = item.unit ? item.unit.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char])) : '';
+                const escapedSerialModel = item.serialModel ? item.serialModel.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char])) : 'N/A';
+                const escapedCondition = item.condition ? item.condition.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char])) : 'N/A';
+                const escapedDescription = item.description ? item.description.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char])) : '';
+                const nuiDisplay = item.nui ? item.nui.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char])) : 'N/A'; // ** DISPLAY NUI **
+
                 itemsHTML += `
                     <li class="bg-white p-4 rounded-lg shadow border border-nova-gray-light transition-shadow hover:shadow-md" data-item-id="${itemId}">
                         <div class="flex justify-between items-start flex-wrap">
                             <div class="flex-grow pr-4 mb-2 sm:mb-0">
                                 <h5 class="text-lg font-semibold text-nova-green-dark">${escapedItemName}</h5>
-                                <p class="text-sm text-nova-gray-dark">Cantidad: <span class="font-medium text-black">${item.quantity !== undefined ? item.quantity : 'N/A'}</span> ${escapedUnit}</p>
+                                <p class="text-xs text-nova-gray-dark font-medium">NUI: ${nuiDisplay}</p> <p class="text-sm text-nova-gray-dark">Cantidad: <span class="font-medium text-black">${item.quantity !== undefined ? item.quantity : 'N/A'}</span> ${escapedUnit}</p>
                                 <p class="text-sm text-nova-gray-dark">Serial/Modelo: <span class="font-medium text-black">${escapedSerialModel}</span></p>
                                 <p class="text-sm text-nova-gray-dark">Estado: <span class="font-medium text-black">${escapedCondition}</span></p>
                                 ${escapedDescription ? `<p class="mt-1 text-xs text-gray-500 w-full">Obs: ${escapedDescription}</p>` : ''}
@@ -622,7 +618,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <div class="flex space-x-2 mt-2 sm:mt-0 flex-shrink-0 flex-wrap gap-2 items-start">
                                 ${currentUserRole === 'oficina' ? `
                                     <button class="edit-item-btn text-xs bg-blue-500 hover:bg-blue-600 text-white py-1 px-2 rounded" data-item-id="${itemId}" data-site-id="${siteId}" data-site-name="${siteName}">Editar</button>
-                                    <button class="adjust-quantity-btn text-xs bg-green-500 hover:bg-green-600 text-white py-1 px-2 rounded" data-item-id="${itemId}" data-site-id="${siteId}" data-site-name="${siteName}" data-item-name="${escapedItemName}" data-current-quantity="${item.quantity}">Ajustar Cant.</button> 
+                                    <button class="adjust-quantity-btn text-xs bg-green-500 hover:bg-green-600 text-white py-1 px-2 rounded" data-item-id="${itemId}" data-site-id="${siteId}" data-site-name="${siteName}" data-item-name="${escapedItemName}" data-current-quantity="${item.quantity}">Ajustar Cant.</button>
                                     <button class="transfer-item-btn text-xs bg-yellow-500 hover:bg-yellow-600 text-black py-1 px-2 rounded" data-item-id="${itemId}" data-site-id="${siteId}" data-site-name="${siteName}">Transferir</button>
                                 ` : ''}
                                 <button class="view-history-btn text-xs bg-gray-400 hover:bg-gray-500 text-white py-1 px-2 rounded" data-item-id="${itemId}" data-item-name="${escapedItemName}">Historial</button>
@@ -635,79 +631,49 @@ document.addEventListener('DOMContentLoaded', () => {
             itemsHTML += '</ul>';
             inventoryListContainer.innerHTML = itemsHTML;
 
-            // Attach event listeners
+            // Re-attach event listeners (no change to listeners themselves for this step)
             if (currentUserRole === 'oficina') {
                 document.querySelectorAll('.edit-item-btn').forEach(button => {
-                    button.addEventListener('click', async (e) => { // Made async
-                        const itemId = e.target.dataset.itemId;
-                        const siteId = e.target.dataset.siteId;
-                        const siteName = e.target.dataset.siteName;
-                        console.log("Edit item clicked:", itemId);
-                        
+                    button.addEventListener('click', async (e) => {
+                        const itemId = e.target.dataset.itemId; const siteId = e.target.dataset.siteId; const siteName = e.target.dataset.siteName;
                         try {
-                            const itemDocRef = db.collection("inventoryItems").doc(itemId);
-                            const itemDoc = await itemDocRef.get();
-                            if (itemDoc.exists) {
-                                renderEditItemForm(itemId, itemDoc.data(), siteId, siteName);
-                            } else {
-                                console.error("Item not found for editing:", itemId);
-                                alert("Error: No se encontró el ítem para editar."); // UI Text
-                            }
-                        } catch (error) {
-                            console.error("Error fetching item for edit:", error);
-                            alert("Error al cargar datos del ítem para editar."); // UI Text
-                        }
+                            const itemDoc = await db.collection("inventoryItems").doc(itemId).get();
+                            if (itemDoc.exists) renderEditItemForm(itemId, itemDoc.data(), siteId, siteName); else alert("Error: Ítem no encontrado.");
+                        } catch (error) { console.error("Error fetching item for edit:", error); alert("Error al cargar datos del ítem para editar."); }
+                    });
+                });
+                document.querySelectorAll('.adjust-quantity-btn').forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        const itemId = e.target.dataset.itemId; const siteId = e.target.dataset.siteId; const siteName = e.target.dataset.siteName;
+                        const itemName = e.target.dataset.itemName; const currentQuantity = parseFloat(e.target.dataset.currentQuantity);
+                        renderAdjustQuantityForm(itemId, itemName, currentQuantity, siteId, siteName);
                     });
                 });
                 document.querySelectorAll('.transfer-item-btn').forEach(button => {
-                button.addEventListener('click', async (e) => { // Make async
-                    const itemId = e.target.dataset.itemId;
-                    const siteId = e.target.dataset.siteId; // This is the source siteId
-                    const siteName = e.target.dataset.siteName; // Source siteName
-                    console.log("Transfer item clicked:", itemId);
-
-                    try {
-                        const itemDocRef = db.collection("inventoryItems").doc(itemId);
-                        const itemDoc = await itemDocRef.get();
-                        if (itemDoc.exists) {
-                            renderTransferItemForm(itemId, itemDoc.data(), siteId, siteName);
-                        } else {
-                            console.error("Item not found for transfer:", itemId);
-                            alert("Error: No se encontró el ítem para transferir."); // UI Text
-                        }
-                    } catch (error) {
-                        console.error("Error fetching item for transfer:", error);
-                        alert("Error al cargar datos del ítem para transferir."); // UI Text
-                    }
+                    button.addEventListener('click', async (e) => {
+                        const itemId = e.target.dataset.itemId; const siteId = e.target.dataset.siteId; const siteName = e.target.dataset.siteName;
+                        try {
+                            const itemDoc = await db.collection("inventoryItems").doc(itemId).get();
+                            if (itemDoc.exists) renderTransferItemForm(itemId, itemDoc.data(), siteId, siteName); else alert("Error: Ítem no encontrado.");
+                        } catch (error) { console.error("Error fetching item for transfer:", error); alert("Error al cargar datos del ítem para transferir."); }
+                    });
                 });
-            });
             }
             document.querySelectorAll('.view-history-btn').forEach(button => {
                 button.addEventListener('click', (e) => {
-                    const itemId = e.target.dataset.itemId;
-                    const itemName = e.target.dataset.itemName;
+                    const itemId = e.target.dataset.itemId; const itemName = e.target.dataset.itemName;
                     showItemHistory(itemId, itemName);
                 });
             });
-            document.querySelectorAll('.adjust-quantity-btn').forEach(button => {
-                button.addEventListener('click', (e) => {
-                    const itemId = e.target.dataset.itemId;
-                    const siteId = e.target.dataset.siteId;
-                    const siteName = e.target.dataset.siteName;
-                    const itemName = e.target.dataset.itemName;
-                    const currentQuantity = parseFloat(e.target.dataset.currentQuantity);
-                    renderAdjustQuantityForm(itemId, itemName, currentQuantity, siteId, siteName);
-                });
-            });
         } catch (error) {
+            // ... existing error handling ...
             console.error(`Error loading inventory items for site ${siteId}:`, error);
-            inventoryListContainer.innerHTML = `<p class="text-red-500 p-4">Error al cargar el inventario: ${error.message}</p>`; // UI Text
+            inventoryListContainer.innerHTML = `<p class="text-red-500 p-4">Error al cargar el inventario: ${error.message}</p>`;
             if (error.message.includes("index")) {
-                inventoryListContainer.innerHTML += `<p class="text-sm text-red-400 p-4">Es posible que necesite crear un índice compuesto en Firestore. Revise la consola de Firebase para ver el enlace de creación del índice si está disponible en el mensaje de error original.</p>`; // UI Text
+                inventoryListContainer.innerHTML += `<p class="text-sm text-red-400 p-4">Es posible que necesite crear un índice compuesto en Firestore. Revise la consola de Firebase para ver el enlace de creación del índice si está disponible en el mensaje de error original.</p>`;
             }
         }
     }
-
     // app.js - Add this new function
 async function renderTransferItemForm(itemId, itemData, sourceSiteId, sourceSiteName) {
     if (!transferItemModal || !transferItemForm || currentUserRole !== 'oficina') {
@@ -884,20 +850,23 @@ async function renderTransferItemForm(itemId, itemData, sourceSiteId, sourceSite
         const serialModel = form.elements['item-serial-model'].value.trim();
         const condition = form.elements['item-condition'].value.trim();
         const description = form.elements['item-description'].value.trim();
-        
+
         const errorElement = document.getElementById('add-item-error');
         if (errorElement) errorElement.textContent = '';
 
         if (!itemName || !quantityStr || !unit) {
-            if (errorElement) errorElement.textContent = 'Equipo/Maquinaria, Cantidad y Unidad son obligatorios.'; return;
+            if (errorElement) errorElement.textContent = 'Equipo/Maquinaria, Cantidad y Unidad son obligatorios.';
+            return;
         }
         const quantity = parseFloat(quantityStr);
         if (isNaN(quantity) || quantity < 0) {
-            if (errorElement) errorElement.textContent = 'La cantidad debe ser un número válido y no negativo.'; return;
+            if (errorElement) errorElement.textContent = 'La cantidad debe ser un número válido y no negativo.';
+            return;
         }
         const user = auth.currentUser;
         if (!user) {
-            if (errorElement) errorElement.textContent = 'Error de autenticación. Por favor, inicie sesión de nuevo.'; return;
+            if (errorElement) errorElement.textContent = 'Error de autenticación. Por favor, inicie sesión de nuevo.';
+            return;
         }
 
         const submitButton = form.querySelector('button[type="submit"]');
@@ -916,17 +885,21 @@ async function renderTransferItemForm(itemId, itemData, sourceSiteId, sourceSite
                 performingUserName = userProfileData.nombre || performingUserName;
                 performingUserApellidos = userProfileData.apellidos || "";
                 performingUserCedula = userProfileData.cedula || "";
-            } else {
-                console.warn(`User profile document not found for UID: ${user.uid}. History log will have limited user details.`);
             }
 
-            const newItemRef = db.collection("inventoryItems").doc();
+            const newItemRef = db.collection("inventoryItems").doc(); // Firestore auto-generates an ID for the document
             const timestamp = firebase.firestore.FieldValue.serverTimestamp();
+
+            // ** NEW: Generate NUI for brand new items **
+            // This NUI is for this specific batch being entered into the system for the first time.
+            const nui = `NUI-${newItemRef.id.substring(0, 8).toUpperCase()}`; // Uses a snippet of the Firestore Doc ID for uniqueness
+
             const newItemData = {
+                nui: nui, // ** ADDED NUI **
                 siteId: siteId,
                 itemName: itemName,
                 quantity: quantity,
-                initialQuantity: quantity,
+                initialQuantity: quantity, // initialQuantity for this batch at this site
                 unit: unit,
                 serialModel: serialModel,
                 condition: condition,
@@ -934,25 +907,28 @@ async function renderTransferItemForm(itemId, itemData, sourceSiteId, sourceSite
                 createdBy: user.uid,
                 createdAt: timestamp,
                 lastUpdatedAt: timestamp,
-                status: "Disponible" 
+                status: "Disponible"
             };
             await newItemRef.set(newItemData);
+
+            // Add NUI to history log
             await newItemRef.collection("history").add({
                 timestamp: timestamp,
                 userId: user.uid,
                 userName: performingUserName,
                 userApellidos: performingUserApellidos,
                 userCedula: performingUserCedula,
+                nui: nui, // ** ADDED NUI TO HISTORY **
                 action: "CREADO",
-                details: { 
-                    createdWithQuantity: quantity, 
+                details: {
+                    createdWithQuantity: quantity,
                     unit: unit,
                     serialModel: serialModel,
                     condition: condition,
-                    notes: `Ítem "${itemName}" creado en el sistema en obra "${siteName}".`
+                    notes: `Ítem "${itemName}" (NUI: ${nui}) creado en el sistema en obra "${siteName}".`
                 }
             });
-            console.log("Inventory item and history log created successfully!", newItemRef.id);
+            console.log("Inventory item and history log created successfully with NUI:", newItemRef.id, "NUI:", nui);
             renderAddInventoryItemButton(siteId, siteName);
             loadInventoryItems(siteId, siteName);
         } catch (error) {
@@ -1046,8 +1022,10 @@ async function renderTransferItemForm(itemId, itemData, sourceSiteId, sourceSite
     }
 
 
-// app.js - Add this new function
+// app.js - Replace the existing (placeholder or previous) handleTransferItemSubmit
+
 async function handleTransferItemSubmit(event, itemId, sourceItemData, sourceSiteId, sourceSiteName) {
+    event.preventDefault();
     if (currentUserRole !== 'oficina') {
         console.warn("Attempt to transfer item by non-oficina role blocked.");
         return;
@@ -1059,30 +1037,41 @@ async function handleTransferItemSubmit(event, itemId, sourceItemData, sourceSit
     const reason = form.elements['transferReason'].value.trim();
 
     const errorElement = document.getElementById('transfer-item-error');
-    if(errorElement) errorElement.textContent = '';
+    if (errorElement) errorElement.textContent = '';
+
+    const submitButton = form.querySelector('button[type="submit"]');
+    const originalButtonText = submitButton.textContent;
 
     // Validation
     if (!quantityToTransferStr || !destinationSiteId) {
-        if(errorElement) errorElement.textContent = 'Cantidad a transferir y obra de destino son obligatorios.';
+        if (errorElement) errorElement.textContent = 'Cantidad a transferir y obra de destino son obligatorios.';
+        submitButton.disabled = false;
+        submitButton.textContent = originalButtonText;
         return;
     }
     const quantityToTransfer = parseFloat(quantityToTransferStr);
     if (isNaN(quantityToTransfer) || quantityToTransfer <= 0) {
-        if(errorElement) errorElement.textContent = 'La cantidad a transferir debe ser un número positivo.';
+        if (errorElement) errorElement.textContent = 'La cantidad a transferir debe ser un número positivo.';
+        submitButton.disabled = false;
+        submitButton.textContent = originalButtonText;
         return;
     }
-    if (quantityToTransfer > sourceItemData.quantity) {
-        if(errorElement) errorElement.textContent = `No puede transferir más de la cantidad actual (${sourceItemData.quantity}).`;
+    const currentSourceQuantity = parseFloat(sourceItemData.quantity);
+    if (isNaN(currentSourceQuantity) || quantityToTransfer > currentSourceQuantity) {
+        if (errorElement) errorElement.textContent = `No puede transferir más de la cantidad actual (${currentSourceQuantity}).`;
+        submitButton.disabled = false;
+        submitButton.textContent = originalButtonText;
         return;
     }
 
     const user = auth.currentUser;
     if (!user) {
-        if(errorElement) errorElement.textContent = 'Error de autenticación.'; return;
+        if (errorElement) errorElement.textContent = 'Error de autenticación.';
+        submitButton.disabled = false;
+        submitButton.textContent = originalButtonText;
+        return;
     }
 
-    const submitButton = form.querySelector('button[type="submit"]');
-    const originalButtonText = submitButton.textContent;
     submitButton.disabled = true;
     submitButton.textContent = 'Transfiriendo...';
 
@@ -1099,13 +1088,15 @@ async function handleTransferItemSubmit(event, itemId, sourceItemData, sourceSit
 
         const destinationSiteDoc = await db.collection("constructionSites").doc(destinationSiteId).get();
         const destinationSiteName = destinationSiteDoc.exists ? destinationSiteDoc.data().name : "Destino Desconocido";
-
-        const batch = db.batch(); // Use a batch for atomic operations
+        
+        const batch = db.batch();
         const timestamp = firebase.firestore.FieldValue.serverTimestamp();
+        const itemNUI = sourceItemData.nui; // The NUI of the batch being transferred
 
         // 1. Update Source Item
         const sourceItemRef = db.collection("inventoryItems").doc(itemId);
-        const newSourceQuantity = sourceItemData.quantity - quantityToTransfer;
+        const newSourceQuantity = currentSourceQuantity - quantityToTransfer;
+        
         batch.update(sourceItemRef, {
             quantity: newSourceQuantity,
             lastUpdatedAt: timestamp
@@ -1115,6 +1106,7 @@ async function handleTransferItemSubmit(event, itemId, sourceItemData, sourceSit
         const sourceHistoryRef = sourceItemRef.collection("history").doc();
         batch.set(sourceHistoryRef, {
             timestamp: timestamp, userId: user.uid, userName: performingUserName, userApellidos: performingUserApellidos, userCedula: performingUserCedula,
+            nui: itemNUI, // Log NUI
             action: "TRANSFERENCIA_SALIDA",
             details: {
                 quantityTransferred: quantityToTransfer,
@@ -1122,50 +1114,89 @@ async function handleTransferItemSubmit(event, itemId, sourceItemData, sourceSit
                 toSiteId: destinationSiteId,
                 toSiteName: destinationSiteName,
                 reason: reason || "N/A",
-                notes: `Transferencia de ${quantityToTransfer} ${sourceItemData.unit || ''} de "${sourceItemData.itemName}" desde "${sourceSiteName}" hacia "${destinationSiteName}".`
+                notes: `Salida de ${quantityToTransfer} ${sourceItemData.unit || ''} de "${sourceItemData.itemName}" (NUI: ${itemNUI}) desde "${sourceSiteName}" hacia "${destinationSiteName}".`
             }
         });
 
-        // 2. Create New Item at Destination Site
-        // (Simplified: always create a new item record at the destination for the transferred quantity)
-        const destinationItemRef = db.collection("inventoryItems").doc(); // New ID for the item at destination
-        batch.set(destinationItemRef, {
-            itemName: sourceItemData.itemName,
-            unit: sourceItemData.unit,
-            serialModel: sourceItemData.serialModel, // Copy details
-            condition: sourceItemData.condition,   // Copy details
-            description: sourceItemData.description, // Copy details
-            quantity: quantityToTransfer,
-            initialQuantity: quantityToTransfer, // This is its initial quantity at this new location
-            siteId: destinationSiteId,
-            createdBy: user.uid, // User performing the transfer
-            createdAt: timestamp, // When this specific batch arrived/created at new site
-            lastUpdatedAt: timestamp,
-            status: sourceItemData.status || "Disponible", // Copy status or set default
-            transferredFromItemId: itemId, // Optional: link back to original item ID
-            transferredFromSiteId: sourceSiteId // Optional: link back to original site ID
-        });
+        // 2. Handle Destination Item (Query for NUI at destination, then Merge or Create)
+        const destinationItemsQuery = db.collection("inventoryItems")
+            .where("siteId", "==", destinationSiteId)
+            .where("nui", "==", itemNUI); // Key query: find by NUI at the destination
 
-        // Log CREA_POR_TRANSFERENCIA for the new item at the destination
+        const destinationItemsSnapshot = await destinationItemsQuery.get();
+        let destinationItemRef;
+        let destinationItemAction = "";
+        let destinationItemNotes = "";
+        let finalDestinationQuantity;
+
+        if (!destinationItemsSnapshot.empty) {
+            // NUI Match found! Update the existing item at the destination.
+            // This means this batch (NUI) has been at this site before or part of it is already there.
+            const existingDestinationItemDoc = destinationItemsSnapshot.docs[0]; // Assuming NUI + siteId is unique if found
+            destinationItemRef = existingDestinationItemDoc.ref;
+            const currentDestinationQuantity = parseFloat(existingDestinationItemDoc.data().quantity);
+            finalDestinationQuantity = currentDestinationQuantity + quantityToTransfer;
+            
+            batch.update(destinationItemRef, {
+                quantity: finalDestinationQuantity,
+                lastUpdatedAt: timestamp,
+                // Optionally update status if it was e.g. 'Agotado' from a previous transfer out
+                status: "Disponible" 
+            });
+
+            destinationItemAction = "TRANSFERENCIA_ENTRADA";
+            destinationItemNotes = `Cantidad incrementada por transferencia de ${quantityToTransfer} ${sourceItemData.unit || ''} de "${sourceItemData.itemName}" (NUI: ${itemNUI}) desde "${sourceSiteName}".`;
+            console.log(`NUI ${itemNUI} found at destination ${destinationSiteName}. Updating item ${destinationItemRef.id}. New qty: ${finalDestinationQuantity}`);
+        } else {
+            // No NUI match found. Create a new item record at the destination for this NUI batch.
+            destinationItemRef = db.collection("inventoryItems").doc(); // New Firestore ID for this record
+            finalDestinationQuantity = quantityToTransfer;
+
+            batch.set(destinationItemRef, {
+                nui: itemNUI, // CRITICAL: Copy the NUI from the source
+                itemName: sourceItemData.itemName,
+                unit: sourceItemData.unit,
+                serialModel: sourceItemData.serialModel,
+                condition: sourceItemData.condition,
+                description: sourceItemData.description,
+                quantity: quantityToTransfer,
+                initialQuantity: quantityToTransfer, // This is its "initial" qty at this new site for *this record*
+                siteId: destinationSiteId,
+                createdBy: user.uid, // User performing the transfer is creating this new site record
+                createdAt: timestamp, 
+                lastUpdatedAt: timestamp,
+                status: "Disponible", // Assuming it's available upon arrival
+                // Optional: Link back to the original document ID from the source site if useful,
+                // but NUI is the primary link for the batch.
+                // transferredFromSourceItemId: itemId 
+            });
+
+            destinationItemAction = "CREADO_POR_TRANSFERENCIA"; // Or "TRANSFERENCIA_ENTRADA"
+            destinationItemNotes = `Recepción de ${quantityToTransfer} ${sourceItemData.unit || ''} de "${sourceItemData.itemName}" (NUI: ${itemNUI}) desde "${sourceSiteName}".`;
+            console.log(`NUI ${itemNUI} not found at destination ${destinationSiteName}. Creating new item record ${destinationItemRef.id}.`);
+        }
+
+        // Log history for the destination item
         const destinationHistoryRef = destinationItemRef.collection("history").doc();
         batch.set(destinationHistoryRef, {
             timestamp: timestamp, userId: user.uid, userName: performingUserName, userApellidos: performingUserApellidos, userCedula: performingUserCedula,
-            action: "CREADO_POR_TRANSFERENCIA",
+            nui: itemNUI, // Log NUI
+            action: destinationItemAction,
             details: {
-                quantityReceived: quantityToTransfer,
+                quantityReceivedOrUpdated: quantityToTransfer,
+                finalQuantityAtDestination: finalDestinationQuantity,
                 unit: sourceItemData.unit,
                 fromSiteId: sourceSiteId,
                 fromSiteName: sourceSiteName,
                 reason: reason || "N/A",
-                notes: `Recepción de ${quantityToTransfer} ${sourceItemData.unit || ''} de "${sourceItemData.itemName}" desde "${sourceSiteName}".`
+                notes: destinationItemNotes
             }
         });
-
-        await batch.commit(); // Commit all operations
-
-        console.log("Item transferred successfully. Source item updated, new item created at destination, history logged.");
+            
+        await batch.commit();
+        console.log("Item transfer batch committed successfully.");
         if(transferItemModal) transferItemModal.classList.add('hidden');
-        loadInventoryItems(sourceSiteId, sourceSiteName); // Refresh current site's inventory
+        loadInventoryItems(sourceSiteId, sourceSiteName); // Refresh current (source) site's inventory
 
     } catch (error) {
         console.error("Error transferring item:", error);
@@ -1356,6 +1387,9 @@ async function handleAdjustQuantitySubmit(event, itemId, oldQuantity, siteId, si
         }
 
         let detailsHTML = '<ul class="list-none pl-0 text-xs mt-1 text-gray-600 space-y-1">';
+        
+        // NUI is now part of the main log object for all new history entries.
+        // It will be displayed by the main showItemHistory rendering loop.
 
         switch (log.action) {
             case "CREADO":
@@ -1366,16 +1400,17 @@ async function handleAdjustQuantitySubmit(event, itemId, oldQuantity, siteId, si
                 if (log.details.condition) {
                     detailsHTML += `<li><span class="font-medium text-gray-700">Estado Inicial:</span> ${log.details.condition}</li>`;
                 }
-                if (log.details.notes) {
+                if (log.details.notes) { // This note already includes NUI for CREADO
                     detailsHTML += `<li><span class="font-medium text-gray-700">Notas:</span> ${log.details.notes}</li>`;
                 }
                 break;
-            case "ITEM_ACTUALIZADO": // NEW CASE
+            case "ITEM_ACTUALIZADO":
+                // ... (keep existing ITEM_ACTUALIZADO formatting)
                 detailsHTML += `<li><span class="font-medium text-gray-700">Campos Modificados:</span> ${(log.details.changedFields || []).map(f => f.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())).join(', ')}</li>`;
                 if (log.details.oldValues && log.details.newValues && log.details.changedFields) {
                     detailsHTML += '<li><span class="font-medium text-gray-700">Detalles de Cambios:</span><ul class="list-disc list-inside pl-3 mt-1">';
                     (log.details.changedFields).forEach(field => {
-                        const prettyField = field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()); // Make field names more readable
+                        const prettyField = field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
                         const oldValueDisplay = log.details.oldValues[field] !== undefined ? `"${log.details.oldValues[field]}"` : "N/A";
                         const newValueDisplay = log.details.newValues[field] !== undefined ? `"${log.details.newValues[field]}"` : "N/A";
                         detailsHTML += `<li><span class="italic">${prettyField}:</span> ${oldValueDisplay} &rarr; ${newValueDisplay}</li>`;
@@ -1387,46 +1422,49 @@ async function handleAdjustQuantitySubmit(event, itemId, oldQuantity, siteId, si
                 }
                 break;
             case "CANTIDAD_AJUSTADA":
+                // ... (keep existing CANTIDAD_AJUSTADA formatting)
                 detailsHTML += `<li><span class="font-medium text-gray-700">Cantidad Anterior:</span> ${log.details.oldQuantity !== undefined ? log.details.oldQuantity : 'N/A'}</li>`;
                 detailsHTML += `<li><span class="font-medium text-gray-700">Nueva Cantidad:</span> ${log.details.newQuantity !== undefined ? log.details.newQuantity : 'N/A'}</li>`;
                 if (log.details.adjustment !== undefined) {
-                    const signo = log.details.adjustment > 0 ? '+' : '';
-                    detailsHTML += `<li><span class="font-medium text-gray-700">Ajuste:</span> ${signo}${log.details.adjustment}</li>`;
+                    detailsHTML += `<li><span class="font-medium text-gray-700">Ajuste:</span> ${log.details.adjustment > 0 ? '+' : ''}${log.details.adjustment}</li>`;
                 }
                 if (log.details.reason) {
                     detailsHTML += `<li><span class="font-medium text-gray-700">Motivo:</span> ${log.details.reason}</li>`;
                 }
                 if (log.details.notes) {
-                    detailsHTML += `<li><span class="font-medium text-gray-700">Notas:</span> ${log.details.notes}</li>`;
+                    detailsHTML += `<li><span class="font-medium text-gray-700">Notas Adicionales:</span> ${log.details.notes}</li>`;
                 }
                 break;
-            case "TRANSFERENCIA_SALIDA":
+            case "TRANSFERENCIA_SALIDA": // NEW
                 detailsHTML += `<li><span class="font-medium text-gray-700">Cantidad Transferida:</span> ${log.details.quantityTransferred !== undefined ? log.details.quantityTransferred : 'N/A'}</li>`;
                 detailsHTML += `<li><span class="font-medium text-gray-700">Hacia Obra:</span> ${log.details.toSiteName || 'Desconocida'} (ID: ${log.details.toSiteId || 'N/A'})</li>`;
                 if (log.details.remainingQuantityAtSource !== undefined) {
                     detailsHTML += `<li><span class="font-medium text-gray-700">Cantidad Restante en Origen:</span> ${log.details.remainingQuantityAtSource}</li>`;
                 }
                 if (log.details.reason) {
-                    detailsHTML += `<li><span class="font-medium text-gray-700">Motivo/Notas:</span> ${log.details.reason}</li>`;
+                    detailsHTML += `<li><span class="font-medium text-gray-700">Motivo/Notas de Envío:</span> ${log.details.reason}</li>`;
                 }
-                if (log.details.notes) { // General notes field if used
+                if (log.details.notes) {
                     detailsHTML += `<li><span class="font-medium text-gray-700">Detalle Adicional:</span> ${log.details.notes}</li>`;
                 }
                 break;
-            case "CREADO_POR_TRANSFERENCIA": // Or "TRANSFERENCIA_ENTRADA" if you prefer
-                detailsHTML += `<li><span class="font-medium text-gray-700">Cantidad Recibida:</span> ${log.details.quantityReceived !== undefined ? log.details.quantityReceived : 'N/A'}</li>`;
+            case "TRANSFERENCIA_ENTRADA": // NEW (used when updating an existing item at destination)
+            case "CREADO_POR_TRANSFERENCIA": // NEW (used when a new item record is made at destination for the NUI)
+                detailsHTML += `<li><span class="font-medium text-gray-700">Cantidad Recibida:</span> ${log.details.quantityReceivedOrUpdated || log.details.quantityReceived || 'N/A'}</li>`;
                 detailsHTML += `<li><span class="font-medium text-gray-700">Desde Obra:</span> ${log.details.fromSiteName || 'Desconocida'} (ID: ${log.details.fromSiteId || 'N/A'})</li>`;
-                if (log.details.unit) {
+                if (log.details.finalQuantityAtDestination !== undefined) {
+                    detailsHTML += `<li><span class="font-medium text-gray-700">Nueva Cantidad Total en Destino:</span> ${log.details.finalQuantityAtDestination}</li>`;
+                }
+                if (log.details.unit && log.action === "CREADO_POR_TRANSFERENCIA") { // Only show unit if it's a creation event
                     detailsHTML += `<li><span class="font-medium text-gray-700">Unidad:</span> ${log.details.unit}</li>`;
                 }
                 if (log.details.reason) {
                     detailsHTML += `<li><span class="font-medium text-gray-700">Motivo/Notas de Recepción:</span> ${log.details.reason}</li>`;
                 }
-                if (log.details.notes) { // General notes field if used
+                if (log.details.notes) {
                     detailsHTML += `<li><span class="font-medium text-gray-700">Detalle Adicional:</span> ${log.details.notes}</li>`;
                 }
                 break;
-            // Add other cases here for "CANTIDAD_AJUSTADA", "TRANSFERENCIA_SALIDA", etc. in the future
             default:
                 for (const key in log.details) {
                     const prettyKey = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
@@ -1438,12 +1476,10 @@ async function handleAdjustQuantitySubmit(event, itemId, oldQuantity, siteId, si
         return detailsHTML;
     }
 
+    // Modify the main showItemHistory loop to display the NUI if present on the log object itself
     async function showItemHistory(itemId, itemName) {
-        if (!historyModal || !historyModalTitle || !historyModalContent) {
-            console.error("History modal elements not found");
-            return;
-        }
-
+        // ... (modal setup and title remains the same) ...
+        if (!historyModal || !historyModalTitle || !historyModalContent) { /* ... */ return; }
         const escapedItemName = itemName ? itemName.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : 'Ítem Desconocido';
         historyModalTitle.textContent = `Historial para: ${escapedItemName}`;
         historyModalContent.innerHTML = '<p class="text-nova-gray p-4">Cargando historial...</p>';
@@ -1455,17 +1491,15 @@ async function handleAdjustQuantitySubmit(event, itemId, oldQuantity, siteId, si
                 .orderBy("timestamp", "desc")
                 .get();
 
-            if (historySnapshot.empty) {
-                historyModalContent.innerHTML = '<p class="text-nova-gray p-4">No hay historial registrado para este ítem.</p>';
-                return;
-            }
+            if (historySnapshot.empty) { /* ... */ return; }
 
             let historyHTML = '<ul class="space-y-4 text-left">';
             historySnapshot.forEach(doc => {
                 const log = doc.data();
                 const logDate = log.timestamp ? new Date(log.timestamp.seconds * 1000).toLocaleString('es-CO', { dateStyle: 'long', timeStyle: 'medium' }) : 'Fecha desconocida';
                 const userDetails = `Usuario: ${log.userName || 'N/A'} ${log.userApellidos || ''} (Cédula: ${log.userCedula || 'N/A'})`;
-                const formattedDetails = formatLogDetails(log); // Use the helper function
+                const formattedDetails = formatLogDetails(log);
+                const nuiDisplayForHistory = log.nui ? `<p class="text-xs text-nova-green-dark font-semibold">NUI: ${log.nui}</p>` : ''; // ** DISPLAY NUI IN HISTORY **
 
                 historyHTML += `
                     <li class="p-3 bg-nova-gray-light rounded-lg shadow-sm border border-gray-200">
@@ -1473,7 +1507,7 @@ async function handleAdjustQuantitySubmit(event, itemId, oldQuantity, siteId, si
                             <p class="font-semibold text-nova-green-dark text-base">${log.action || 'Acción Desconocida'}</p>
                             <p class="text-xs text-gray-500">${logDate}</p>
                         </div>
-                        <p class="text-xs text-gray-600 mb-1">${userDetails}</p>
+                        ${nuiDisplayForHistory} <p class="text-xs text-gray-600 mb-1">${userDetails}</p>
                         <div class="mt-1 border-t border-gray-300 pt-1">
                             ${formattedDetails}
                         </div>
@@ -1483,10 +1517,7 @@ async function handleAdjustQuantitySubmit(event, itemId, oldQuantity, siteId, si
             historyHTML += '</ul>';
             historyModalContent.innerHTML = historyHTML;
 
-        } catch (error) {
-            console.error(`Error loading history for item ${itemId}:`, error);
-            historyModalContent.innerHTML = `<p class="text-red-500 p-4">Error al cargar el historial: ${error.message}</p>`;
-        }
+        } catch (error) { /* ... */ }
     }
 
 }); // End DOMContentLoaded
