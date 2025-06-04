@@ -5,17 +5,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // -- START: Firebase Configuration --
     // ACTION: Replace this with your project's Firebase configuration
     // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyDydDrSWx8eS3MgLfdpzbWWxTrxBaUINvU",
-  authDomain: "sinu-nova-urbano.firebaseapp.com",
-  projectId: "sinu-nova-urbano",
-  storageBucket: "sinu-nova-urbano.firebasestorage.app",
-  messagingSenderId: "984651974634",
-  appId: "1:984651974634:web:f1108efa92e11e90161493",
-  measurementId: "G-LZ4R7S6EPG"
-};
+    const firebaseConfig = {
+        apiKey: "AIzaSyDydDrSWx8eS3MgLfdpzbWWxTrxBaUINvU",
+        authDomain: "sinu-nova-urbano.firebaseapp.com",
+        projectId: "sinu-nova-urbano",
+        storageBucket: "sinu-nova-urbano.firebasestorage.app",
+        messagingSenderId: "984651974634",
+        appId: "1:984651974634:web:f1108efa92e11e90161493",
+        measurementId: "G-LZ4R7S6EPG"
+    };
 
-     // Initialize Firebase
+    // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
@@ -49,7 +49,7 @@ const firebaseConfig = {
     const historyModalContent = document.getElementById('history-modal-content');
     const closeHistoryModalButton = document.getElementById('close-history-modal-button');
 
-     // Edit Item Modal Elements
+    // Edit Item Modal Elements
     const editItemModal = document.getElementById('edit-item-modal');
     const editItemForm = document.getElementById('edit-item-form');
     const editItemModalTitle = document.getElementById('edit-item-modal-title');
@@ -78,7 +78,7 @@ const firebaseConfig = {
         if (addItemFormContainer) addItemFormContainer.innerHTML = '';
         renderAddSiteButton();
     }
-    
+
     function showDashboardSection() {
         authSection.classList.add('hidden');
         dashboardSection.classList.remove('hidden');
@@ -89,7 +89,7 @@ const firebaseConfig = {
     auth.onAuthStateChanged(async user => {
         if (user) {
             console.log("User signed in:", user.uid, user.email);
-            currentUserRole = null; 
+            currentUserRole = null;
 
             try {
                 const userDocRef = db.collection("users").doc(user.uid);
@@ -99,20 +99,20 @@ const firebaseConfig = {
                     const userData = userDoc.data();
                     currentUserRole = (userData.roles && userData.roles.length > 0) ? userData.roles[0] : 'espectador';
                     console.log("User is approved. Role:", currentUserRole);
-                    
-                    const userNameDisplay = (userData.nombre && userData.apellidos) 
-                                     ? `${userData.nombre} ${userData.apellidos}` 
-                                     : user.email || 'Usuario';
-                    if(dashboardTitle) dashboardTitle.textContent = `Panel de ${userNameDisplay} (${currentUserRole})`;
-                    
+
+                    const userNameDisplay = (userData.nombre && userData.apellidos)
+                        ? `${userData.nombre} ${userData.apellidos}`
+                        : user.email || 'Usuario';
+                    if (dashboardTitle) dashboardTitle.textContent = `Panel de ${userNameDisplay} (${currentUserRole})`;
+
                     showDashboardSection();
                     loadConstructionSites();
                 } else {
                     console.log("User is NOT approved or profile doesn't exist yet.");
-                    currentUserRole = null; 
-                    showAuthSection(); 
-                    if(authTitle) authTitle.textContent = "Cuenta Pendiente de Aprobación";
-                    if(loginFormContainer) {
+                    currentUserRole = null;
+                    showAuthSection();
+                    if (authTitle) authTitle.textContent = "Cuenta Pendiente de Aprobación";
+                    if (loginFormContainer) {
                         loginFormContainer.innerHTML = `
                             <p class="text-center text-nova-gray-dark mb-4">
                                 Su cuenta (${user.email || 'Nueva cuenta'}) ha sido registrada pero está pendiente de aprobación por un administrador.
@@ -122,10 +122,10 @@ const firebaseConfig = {
                                 Cerrar Sesión
                             </button>
                         `;
-                        if(registrationArea) registrationArea.innerHTML = '';
-                        
+                        if (registrationArea) registrationArea.innerHTML = '';
+
                         const logoutPendingButton = document.getElementById('logout-pending-button');
-                        if(logoutPendingButton) {
+                        if (logoutPendingButton) {
                             logoutPendingButton.addEventListener('click', () => auth.signOut());
                         }
                     }
@@ -134,22 +134,22 @@ const firebaseConfig = {
                 console.error("Error fetching user approval status:", error);
                 currentUserRole = null;
                 showAuthSection();
-                if(authTitle) authTitle.textContent = "Error de Cuenta";
-                if(loginFormContainer) loginFormContainer.innerHTML = `<p class="text-red-500 text-center">Error al verificar el estado de su cuenta. Por favor, intente recargar la página o contacte soporte.</p> 
+                if (authTitle) authTitle.textContent = "Error de Cuenta";
+                if (loginFormContainer) loginFormContainer.innerHTML = `<p class="text-red-500 text-center">Error al verificar el estado de su cuenta. Por favor, intente recargar la página o contacte soporte.</p> 
                     <button id="logout-error-button" class="w-full mt-4 bg-nova-green hover:bg-nova-green-dark text-white font-bold py-2 px-4 rounded">Cerrar Sesión</button>`;
-                if(registrationArea) registrationArea.innerHTML = '';
+                if (registrationArea) registrationArea.innerHTML = '';
                 const logoutErrorButton = document.getElementById('logout-error-button');
-                if(logoutErrorButton) logoutErrorButton.addEventListener('click', () => auth.signOut());
+                if (logoutErrorButton) logoutErrorButton.addEventListener('click', () => auth.signOut());
             }
 
         } else {
             currentUserRole = null;
             console.log("User signed out.");
-            if(dashboardTitle) dashboardTitle.textContent = 'Panel Principal';
-            if(authTitle) authTitle.textContent = 'Bienvenido';
+            if (dashboardTitle) dashboardTitle.textContent = 'Panel Principal';
+            if (authTitle) authTitle.textContent = 'Bienvenido';
             showAuthSection();
-            if(sitesListContainer) sitesListContainer.innerHTML = '<p class="text-nova-gray">Cargando obras...</p>';
-            if(addSiteFormContainer) addSiteFormContainer.innerHTML = '';
+            if (sitesListContainer) sitesListContainer.innerHTML = '<p class="text-nova-gray">Cargando obras...</p>';
+            if (addSiteFormContainer) addSiteFormContainer.innerHTML = '';
             renderLoginForm();
         }
     });
@@ -167,7 +167,7 @@ const firebaseConfig = {
     // --- Render Login Form ---
     function renderLoginForm() {
         if (!loginFormContainer) return;
-        if(authTitle) authTitle.textContent = 'Bienvenido';
+        if (authTitle) authTitle.textContent = 'Bienvenido';
         loginFormContainer.innerHTML = `
             <form id="login-form" class="space-y-6">
                 <div>
@@ -197,7 +197,7 @@ const firebaseConfig = {
                 </p>
             `;
             const showSignupLink = document.getElementById('show-signup-link');
-            if(showSignupLink) {
+            if (showSignupLink) {
                 showSignupLink.addEventListener('click', (e) => {
                     e.preventDefault();
                     renderSignupForm();
@@ -212,12 +212,12 @@ const firebaseConfig = {
                 const email = loginForm['login-email'].value;
                 const password = loginForm['login-password'].value;
                 const loginErrorEl = document.getElementById('login-error');
-                if(loginErrorEl) loginErrorEl.textContent = '';
+                if (loginErrorEl) loginErrorEl.textContent = '';
                 try {
                     await auth.signInWithEmailAndPassword(email, password);
                 } catch (error) {
                     console.error("Login error:", error);
-                    if(loginErrorEl) loginErrorEl.textContent = getFirebaseAuthErrorMessage(error);
+                    if (loginErrorEl) loginErrorEl.textContent = getFirebaseAuthErrorMessage(error);
                 }
             });
         }
@@ -226,7 +226,7 @@ const firebaseConfig = {
     // --- Render Signup Form ---
     function renderSignupForm() {
         if (!loginFormContainer) return;
-        if(authTitle) authTitle.textContent = 'Crear Nueva Cuenta';
+        if (authTitle) authTitle.textContent = 'Crear Nueva Cuenta';
         loginFormContainer.innerHTML = `
             <form id="signup-form" class="space-y-3">
                 <div>
@@ -291,8 +291,8 @@ const firebaseConfig = {
                     <a href="#" id="show-login-link" class="font-medium text-nova-green hover:text-nova-green-dark">Inicia sesión aquí</a>
                 </p>
             `;
-             const showLoginLink = document.getElementById('show-login-link');
-            if(showLoginLink) {
+            const showLoginLink = document.getElementById('show-login-link');
+            if (showLoginLink) {
                 showLoginLink.addEventListener('click', (e) => {
                     e.preventDefault();
                     renderLoginForm();
@@ -318,14 +318,14 @@ const firebaseConfig = {
         const dataConsentChecked = form['data-consent'].checked;
         
         const signupErrorEl = document.getElementById('signup-error');
-        if(signupErrorEl) signupErrorEl.textContent = '';
+        if (signupErrorEl) signupErrorEl.textContent = '';
 
         if (!nombre || !apellidos || !cedula) {
-            if(signupErrorEl) signupErrorEl.textContent = "Nombre, apellidos y cédula son obligatorios.";
+            if (signupErrorEl) signupErrorEl.textContent = "Nombre, apellidos y cédula son obligatorios.";
             return;
         }
         if (password !== confirmPassword) {
-            if(signupErrorEl) signupErrorEl.textContent = "Las contraseñas no coinciden.";
+            if (signupErrorEl) signupErrorEl.textContent = "Las contraseñas no coinciden.";
             return;
         }
         const passwordMinLength = 12;
@@ -338,11 +338,11 @@ const firebaseConfig = {
             passwordErrorMessage += 'La contraseña debe incluir al menos uno de los siguientes símbolos: & % # "';
         }
         if (passwordErrorMessage) {
-            if(signupErrorEl) signupErrorEl.textContent = passwordErrorMessage.trim();
+            if (signupErrorEl) signupErrorEl.textContent = passwordErrorMessage.trim();
             return;
         }
         if (!dataConsentChecked) {
-            if(signupErrorEl) signupErrorEl.textContent = "Debe aceptar la política de tratamiento de datos para registrarse.";
+            if (signupErrorEl) signupErrorEl.textContent = "Debe aceptar la política de tratamiento de datos para registrarse.";
             return;
         }
 
@@ -371,7 +371,7 @@ const firebaseConfig = {
             
         } catch (error) {
             console.error("Signup error:", error);
-            if(signupErrorEl) signupErrorEl.textContent = getFirebaseAuthErrorMessage(error);
+            if (signupErrorEl) signupErrorEl.textContent = getFirebaseAuthErrorMessage(error);
             submitButton.disabled = false;
             submitButton.textContent = originalButtonText;
         }
@@ -553,105 +553,105 @@ const firebaseConfig = {
     }
 
     async function loadInventoryItems(siteId, siteName) {
-    if (!inventoryListContainer) {
-        console.error("Inventory list container not found");
-        return;
-    }
-    inventoryListContainer.innerHTML = `<p class="text-nova-gray p-4">Cargando inventario para ${siteName}...</p>`;
-    const user = auth.currentUser;
-    if (!user) {
-        inventoryListContainer.innerHTML = '<p class="text-red-500 p-4">Error: Usuario no autenticado.</p>';
-        return;
-    }
-    try {
-        const inventorySnapshot = await db.collection("inventoryItems")
+        if (!inventoryListContainer) {
+            console.error("Inventory list container not found");
+            return;
+        }
+        inventoryListContainer.innerHTML = `<p class="text-nova-gray p-4">Cargando inventario para ${siteName}...</p>`;
+        const user = auth.currentUser;
+        if (!user) {
+            inventoryListContainer.innerHTML = '<p class="text-red-500 p-4">Error: Usuario no autenticado.</p>';
+            return;
+        }
+        try {
+            const inventorySnapshot = await db.collection("inventoryItems")
                                           .where("siteId", "==", siteId)
                                           .orderBy("itemName", "asc")
                                           .get();
-        if (inventorySnapshot.empty) {
-            inventoryListContainer.innerHTML = `<p class="text-nova-gray p-4">No hay ítems de inventario para esta obra (${siteName}).</p>`;
-            return;
-        }
-        let itemsHTML = '<ul class="space-y-3">';
-        inventorySnapshot.forEach(doc => {
-            const item = doc.data();
-            const itemId = doc.id;
-            const escapedItemName = item.itemName ? item.itemName.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : 'Ítem sin nombre';
-            const escapedUnit = item.unit ? item.unit.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : '';
-            const escapedSerialModel = item.serialModel ? item.serialModel.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : 'N/A';
-            const escapedCondition = item.condition ? item.condition.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : 'N/A';
-            const escapedDescription = item.description ? item.description.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : '';
-            
-            itemsHTML += `
-                <li class="bg-white p-4 rounded-lg shadow border border-nova-gray-light transition-shadow hover:shadow-md" data-item-id="${itemId}">
-                    <div class="flex justify-between items-start flex-wrap">
-                        <div class="flex-grow pr-4 mb-2 sm:mb-0">
-                            <h5 class="text-lg font-semibold text-nova-green-dark">${escapedItemName}</h5>
-                            <p class="text-sm text-nova-gray-dark">Cantidad: <span class="font-medium text-black">${item.quantity !== undefined ? item.quantity : 'N/A'}</span> ${escapedUnit}</p>
-                            <p class="text-sm text-nova-gray-dark">Serial/Modelo: <span class="font-medium text-black">${escapedSerialModel}</span></p>
-                            <p class="text-sm text-nova-gray-dark">Estado: <span class="font-medium text-black">${escapedCondition}</span></p>
-                            ${escapedDescription ? `<p class="mt-1 text-xs text-gray-500 w-full">Obs: ${escapedDescription}</p>` : ''}
+            if (inventorySnapshot.empty) {
+                inventoryListContainer.innerHTML = `<p class="text-nova-gray p-4">No hay ítems de inventario para esta obra (${siteName}).</p>`;
+                return;
+            }
+            let itemsHTML = '<ul class="space-y-3">';
+            inventorySnapshot.forEach(doc => {
+                const item = doc.data();
+                const itemId = doc.id;
+                const escapedItemName = item.itemName ? item.itemName.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : 'Ítem sin nombre';
+                const escapedUnit = item.unit ? item.unit.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : '';
+                const escapedSerialModel = item.serialModel ? item.serialModel.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : 'N/A';
+                const escapedCondition = item.condition ? item.condition.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : 'N/A';
+                const escapedDescription = item.description ? item.description.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : '';
+                
+                itemsHTML += `
+                    <li class="bg-white p-4 rounded-lg shadow border border-nova-gray-light transition-shadow hover:shadow-md" data-item-id="${itemId}">
+                        <div class="flex justify-between items-start flex-wrap">
+                            <div class="flex-grow pr-4 mb-2 sm:mb-0">
+                                <h5 class="text-lg font-semibold text-nova-green-dark">${escapedItemName}</h5>
+                                <p class="text-sm text-nova-gray-dark">Cantidad: <span class="font-medium text-black">${item.quantity !== undefined ? item.quantity : 'N/A'}</span> ${escapedUnit}</p>
+                                <p class="text-sm text-nova-gray-dark">Serial/Modelo: <span class="font-medium text-black">${escapedSerialModel}</span></p>
+                                <p class="text-sm text-nova-gray-dark">Estado: <span class="font-medium text-black">${escapedCondition}</span></p>
+                                ${escapedDescription ? `<p class="mt-1 text-xs text-gray-500 w-full">Obs: ${escapedDescription}</p>` : ''}
+                            </div>
+                            <div class="flex space-x-2 mt-2 sm:mt-0 flex-shrink-0 flex-wrap gap-2 items-start">
+                                ${currentUserRole === 'oficina' ? `
+                                    <button class="edit-item-btn text-xs bg-blue-500 hover:bg-blue-600 text-white py-1 px-2 rounded" data-item-id="${itemId}" data-site-id="${siteId}" data-site-name="${siteName}">Editar</button>
+                                    <button class="transfer-item-btn text-xs bg-yellow-500 hover:bg-yellow-600 text-black py-1 px-2 rounded" data-item-id="${itemId}" data-site-id="${siteId}" data-site-name="${siteName}">Transferir</button>
+                                ` : ''}
+                                <button class="view-history-btn text-xs bg-gray-400 hover:bg-gray-500 text-white py-1 px-2 rounded" data-item-id="${itemId}" data-item-name="${escapedItemName}">Historial</button>
+                            </div>
                         </div>
-                        <div class="flex space-x-2 mt-2 sm:mt-0 flex-shrink-0 flex-wrap gap-2 items-start">
-                            ${currentUserRole === 'oficina' ? `
-                                <button class="edit-item-btn text-xs bg-blue-500 hover:bg-blue-600 text-white py-1 px-2 rounded" data-item-id="${itemId}" data-site-id="${siteId}" data-site-name="${siteName}">Editar</button>
-                                <button class="transfer-item-btn text-xs bg-yellow-500 hover:bg-yellow-600 text-black py-1 px-2 rounded" data-item-id="${itemId}" data-site-id="${siteId}" data-site-name="${siteName}">Transferir</button>
-                            ` : ''}
-                            <button class="view-history-btn text-xs bg-gray-400 hover:bg-gray-500 text-white py-1 px-2 rounded" data-item-id="${itemId}" data-item-name="${escapedItemName}">Historial</button>
-                        </div>
-                    </div>
-                    <p class="text-xs text-gray-400 mt-2 w-full text-right">Añadido: ${item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleDateString() : 'N/A'}</p>
-                </li>
-            `;
-        });
-        itemsHTML += '</ul>';
-        inventoryListContainer.innerHTML = itemsHTML;
+                        <p class="text-xs text-gray-400 mt-2 w-full text-right">Añadido: ${item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleDateString() : 'N/A'}</p>
+                    </li>
+                `;
+            });
+            itemsHTML += '</ul>';
+            inventoryListContainer.innerHTML = itemsHTML;
 
-        // Attach event listeners
-        if (currentUserRole === 'oficina') {
-            document.querySelectorAll('.edit-item-btn').forEach(button => {
-                button.addEventListener('click', async (e) => { // Made async
-                    const itemId = e.target.dataset.itemId;
-                    const siteId = e.target.dataset.siteId;
-                    const siteName = e.target.dataset.siteName;
-                    console.log("Edit item clicked:", itemId);
-                    
-                    try {
-                        const itemDocRef = db.collection("inventoryItems").doc(itemId);
-                        const itemDoc = await itemDocRef.get();
-                        if (itemDoc.exists) {
-                            renderEditItemForm(itemId, itemDoc.data(), siteId, siteName);
-                        } else {
-                            console.error("Item not found for editing:", itemId);
-                            alert("Error: No se encontró el ítem para editar."); // UI Text
+            // Attach event listeners
+            if (currentUserRole === 'oficina') {
+                document.querySelectorAll('.edit-item-btn').forEach(button => {
+                    button.addEventListener('click', async (e) => { // Made async
+                        const itemId = e.target.dataset.itemId;
+                        const siteId = e.target.dataset.siteId;
+                        const siteName = e.target.dataset.siteName;
+                        console.log("Edit item clicked:", itemId);
+                        
+                        try {
+                            const itemDocRef = db.collection("inventoryItems").doc(itemId);
+                            const itemDoc = await itemDocRef.get();
+                            if (itemDoc.exists) {
+                                renderEditItemForm(itemId, itemDoc.data(), siteId, siteName);
+                            } else {
+                                console.error("Item not found for editing:", itemId);
+                                alert("Error: No se encontró el ítem para editar."); // UI Text
+                            }
+                        } catch (error) {
+                            console.error("Error fetching item for edit:", error);
+                            alert("Error al cargar datos del ítem para editar."); // UI Text
                         }
-                    } catch (error) {
-                        console.error("Error fetching item for edit:", error);
-                        alert("Error al cargar datos del ítem para editar."); // UI Text
-                    }
+                    });
+                });
+                document.querySelectorAll('.transfer-item-btn').forEach(button => {
+                    button.addEventListener('click', (e) => { 
+                        alert(`Transferir ítem: ${e.target.dataset.itemId} (Funcionalidad pendiente)`); // UI Text
+                    });
+                });
+            }
+            document.querySelectorAll('.view-history-btn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const itemId = e.target.dataset.itemId;
+                    const itemName = e.target.dataset.itemName;
+                    showItemHistory(itemId, itemName);
                 });
             });
-            document.querySelectorAll('.transfer-item-btn').forEach(button => {
-                button.addEventListener('click', (e) => { 
-                    alert(`Transferir ítem: ${e.target.dataset.itemId} (Funcionalidad pendiente)`); // UI Text
-                });
-            });
-        }
-        document.querySelectorAll('.view-history-btn').forEach(button => {
-            button.addEventListener('click', (e) => {
-                const itemId = e.target.dataset.itemId;
-                const itemName = e.target.dataset.itemName;
-                showItemHistory(itemId, itemName);
-            });
-        });
-    } catch (error) {
-        console.error(`Error loading inventory items for site ${siteId}:`, error);
-        inventoryListContainer.innerHTML = `<p class="text-red-500 p-4">Error al cargar el inventario: ${error.message}</p>`; // UI Text
-        if (error.message.includes("index")) {
-            inventoryListContainer.innerHTML += `<p class="text-sm text-red-400 p-4">Es posible que necesite crear un índice compuesto en Firestore. Revise la consola de Firebase para ver el enlace de creación del índice si está disponible en el mensaje de error original.</p>`; // UI Text
+        } catch (error) {
+            console.error(`Error loading inventory items for site ${siteId}:`, error);
+            inventoryListContainer.innerHTML = `<p class="text-red-500 p-4">Error al cargar el inventario: ${error.message}</p>`; // UI Text
+            if (error.message.includes("index")) {
+                inventoryListContainer.innerHTML += `<p class="text-sm text-red-400 p-4">Es posible que necesite crear un índice compuesto en Firestore. Revise la consola de Firebase para ver el enlace de creación del índice si está disponible en el mensaje de error original.</p>`; // UI Text
+            }
         }
     }
-}
 
     function renderAddInventoryItemButton(siteId, siteName) {
         if (!addItemFormContainer) return;
@@ -672,7 +672,7 @@ const firebaseConfig = {
 
     function renderAddInventoryItemForm(siteId, siteName) {
         if (!addItemFormContainer || currentUserRole !== 'oficina') {
-            if(addItemFormContainer) addItemFormContainer.innerHTML = ''; return;
+            if (addItemFormContainer) addItemFormContainer.innerHTML = ''; return;
         }
         const escapedSiteName = siteName.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
         addItemFormContainer.innerHTML = `
@@ -825,8 +825,8 @@ const firebaseConfig = {
             event.preventDefault(); // Prevent default form submission
             // Retrieve stored values needed by the handler
             const itemId = editItemIdInput.value;
-            const siteId = editItemSiteIdInput.value; 
-            const siteName = editItemSiteNameInput.value; 
+            const siteId = editItemSiteIdInput.value;
+            const siteName = editItemSiteNameInput.value;
             const oldItemDataString = event.target.dataset.oldData;
             
             if (!itemId || !siteId || !siteName || !oldItemDataString) {
@@ -898,8 +898,15 @@ const firebaseConfig = {
                 timestamp: firebase.firestore.FieldValue.serverTimestamp(), userId:user.uid, userName:pUserName, userApellidos:pUserApellidos, userCedula:pUserCedula,
                 action: "ITEM_ACTUALIZADO", details: { changedFields: Object.keys(changes), oldValues: oldVals, newValues: newVals, notes: `Ítem "${updated.itemName}" actualizado.`}
             });
-            console.log("Item updated:", itemId); if(editItemModal) editItemModal.classList.add('hidden'); loadInventoryItems(siteId, siteName);
-        } catch (error) { console.error("Error updating item:", error); if(errEl) errEl.textContent=`Error: ${error.message}`; btn.disabled=false; btn.textContent=btnTxt; }
+            console.log("Item updated:", itemId); 
+            btn.disabled = false; btn.textContent = btnTxt; // <-- FIX: re-enable button after success
+            if(editItemModal) editItemModal.classList.add('hidden'); 
+            loadInventoryItems(siteId, siteName);
+        } catch (error) { 
+            console.error("Error updating item:", error); 
+            if(errEl) errEl.textContent=`Error: ${error.message}`; 
+            btn.disabled=false; btn.textContent=btnTxt; 
+        }
     }
 
     // --- Item History Modal Functions ---
@@ -908,115 +915,115 @@ const firebaseConfig = {
 
     // --- Item History Modal Functions ---
     if (closeHistoryModalButton && historyModal) {
-    closeHistoryModalButton.addEventListener('click', () => {
-        historyModal.classList.add('hidden');
-    });
-    // Optional: Close modal if clicked outside of the content
-    historyModal.addEventListener('click', (event) => {
-        if (event.target === historyModal) { // Check if the click is on the backdrop itself
+        closeHistoryModalButton.addEventListener('click', () => {
             historyModal.classList.add('hidden');
-        }
-    });
+        });
+        // Optional: Close modal if clicked outside of the content
+        historyModal.addEventListener('click', (event) => {
+            if (event.target === historyModal) { // Check if the click is on the backdrop itself
+                historyModal.classList.add('hidden');
+            }
+        });
     }
 
     // Helper function to format log details based on action type
     function formatLogDetails(log) {
-    if (!log.details || typeof log.details !== 'object' || Object.keys(log.details).length === 0) {
-        return '<p class="text-xs text-gray-500 mt-1">No hay detalles adicionales para esta entrada.</p>';
-    }
+        if (!log.details || typeof log.details !== 'object' || Object.keys(log.details).length === 0) {
+            return '<p class="text-xs text-gray-500 mt-1">No hay detalles adicionales para esta entrada.</p>';
+        }
 
-    let detailsHTML = '<ul class="list-none pl-0 text-xs mt-1 text-gray-600 space-y-1">';
+        let detailsHTML = '<ul class="list-none pl-0 text-xs mt-1 text-gray-600 space-y-1">';
 
-    switch (log.action) {
-        case "CREADO":
-            detailsHTML += `<li><span class="font-medium text-gray-700">Cantidad Inicial:</span> ${log.details.createdWithQuantity !== undefined ? log.details.createdWithQuantity : 'N/A'} ${log.details.unit || ''}</li>`;
-            if (log.details.serialModel) {
-                detailsHTML += `<li><span class="font-medium text-gray-700">Serial/Modelo:</span> ${log.details.serialModel}</li>`;
-            }
-            if (log.details.condition) {
-                detailsHTML += `<li><span class="font-medium text-gray-700">Estado Inicial:</span> ${log.details.condition}</li>`;
-            }
-            if (log.details.notes) {
-                detailsHTML += `<li><span class="font-medium text-gray-700">Notas:</span> ${log.details.notes}</li>`;
-            }
-            break;
-        case "ITEM_ACTUALIZADO": // NEW CASE
-            detailsHTML += `<li><span class="font-medium text-gray-700">Campos Modificados:</span> ${(log.details.changedFields || []).map(f => f.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())).join(', ')}</li>`;
-            if (log.details.oldValues && log.details.newValues && log.details.changedFields) {
-                detailsHTML += '<li><span class="font-medium text-gray-700">Detalles de Cambios:</span><ul class="list-disc list-inside pl-3 mt-1">';
-                (log.details.changedFields).forEach(field => {
-                     const prettyField = field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()); // Make field names more readable
-                     const oldValueDisplay = log.details.oldValues[field] !== undefined ? `"${log.details.oldValues[field]}"` : "N/A";
-                     const newValueDisplay = log.details.newValues[field] !== undefined ? `"${log.details.newValues[field]}"` : "N/A";
-                     detailsHTML += `<li><span class="italic">${prettyField}:</span> ${oldValueDisplay} &rarr; ${newValueDisplay}</li>`;
-                });
-                detailsHTML += '</ul></li>';
-            }
-             if (log.details.notes) {
-                detailsHTML += `<li><span class="font-medium text-gray-700">Notas:</span> ${log.details.notes}</li>`;
-            }
-            break;
-        // Add other cases here for "CANTIDAD_AJUSTADA", "TRANSFERENCIA_SALIDA", etc. in the future
-        default:
-            for (const key in log.details) {
-                const prettyKey = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
-                detailsHTML += `<li><span class="font-medium text-gray-700">${prettyKey}:</span> ${log.details[key]}</li>`;
-            }
-            break;
+        switch (log.action) {
+            case "CREADO":
+                detailsHTML += `<li><span class="font-medium text-gray-700">Cantidad Inicial:</span> ${log.details.createdWithQuantity !== undefined ? log.details.createdWithQuantity : 'N/A'} ${log.details.unit || ''}</li>`;
+                if (log.details.serialModel) {
+                    detailsHTML += `<li><span class="font-medium text-gray-700">Serial/Modelo:</span> ${log.details.serialModel}</li>`;
+                }
+                if (log.details.condition) {
+                    detailsHTML += `<li><span class="font-medium text-gray-700">Estado Inicial:</span> ${log.details.condition}</li>`;
+                }
+                if (log.details.notes) {
+                    detailsHTML += `<li><span class="font-medium text-gray-700">Notas:</span> ${log.details.notes}</li>`;
+                }
+                break;
+            case "ITEM_ACTUALIZADO": // NEW CASE
+                detailsHTML += `<li><span class="font-medium text-gray-700">Campos Modificados:</span> ${(log.details.changedFields || []).map(f => f.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())).join(', ')}</li>`;
+                if (log.details.oldValues && log.details.newValues && log.details.changedFields) {
+                    detailsHTML += '<li><span class="font-medium text-gray-700">Detalles de Cambios:</span><ul class="list-disc list-inside pl-3 mt-1">';
+                    (log.details.changedFields).forEach(field => {
+                        const prettyField = field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()); // Make field names more readable
+                        const oldValueDisplay = log.details.oldValues[field] !== undefined ? `"${log.details.oldValues[field]}"` : "N/A";
+                        const newValueDisplay = log.details.newValues[field] !== undefined ? `"${log.details.newValues[field]}"` : "N/A";
+                        detailsHTML += `<li><span class="italic">${prettyField}:</span> ${oldValueDisplay} &rarr; ${newValueDisplay}</li>`;
+                    });
+                    detailsHTML += '</ul></li>';
+                }
+                if (log.details.notes) {
+                    detailsHTML += `<li><span class="font-medium text-gray-700">Notas:</span> ${log.details.notes}</li>`;
+                }
+                break;
+            // Add other cases here for "CANTIDAD_AJUSTADA", "TRANSFERENCIA_SALIDA", etc. in the future
+            default:
+                for (const key in log.details) {
+                    const prettyKey = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+                    detailsHTML += `<li><span class="font-medium text-gray-700">${prettyKey}:</span> ${log.details[key]}</li>`;
+                }
+                break;
+        }
+        detailsHTML += '</ul>';
+        return detailsHTML;
     }
-    detailsHTML += '</ul>';
-    return detailsHTML;
-}
 
     async function showItemHistory(itemId, itemName) {
-    if (!historyModal || !historyModalTitle || !historyModalContent) {
-        console.error("History modal elements not found");
-        return;
-    }
-
-    const escapedItemName = itemName ? itemName.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : 'Ítem Desconocido';
-    historyModalTitle.textContent = `Historial para: ${escapedItemName}`;
-    historyModalContent.innerHTML = '<p class="text-nova-gray p-4">Cargando historial...</p>';
-    historyModal.classList.remove('hidden');
-
-    try {
-        const historySnapshot = await db.collection("inventoryItems").doc(itemId)
-                                        .collection("history")
-                                        .orderBy("timestamp", "desc")
-                                        .get();
-
-        if (historySnapshot.empty) {
-            historyModalContent.innerHTML = '<p class="text-nova-gray p-4">No hay historial registrado para este ítem.</p>';
+        if (!historyModal || !historyModalTitle || !historyModalContent) {
+            console.error("History modal elements not found");
             return;
         }
 
-        let historyHTML = '<ul class="space-y-4 text-left">';
-        historySnapshot.forEach(doc => {
-            const log = doc.data();
-            const logDate = log.timestamp ? new Date(log.timestamp.seconds * 1000).toLocaleString('es-CO', { dateStyle: 'long', timeStyle: 'medium' }) : 'Fecha desconocida';
-            const userDetails = `Usuario: ${log.userName || 'N/A'} ${log.userApellidos || ''} (Cédula: ${log.userCedula || 'N/A'})`;
-            const formattedDetails = formatLogDetails(log); // Use the helper function
+        const escapedItemName = itemName ? itemName.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : 'Ítem Desconocido';
+        historyModalTitle.textContent = `Historial para: ${escapedItemName}`;
+        historyModalContent.innerHTML = '<p class="text-nova-gray p-4">Cargando historial...</p>';
+        historyModal.classList.remove('hidden');
 
-            historyHTML += `
-                <li class="p-3 bg-nova-gray-light rounded-lg shadow-sm border border-gray-200">
-                    <div class="flex justify-between items-center mb-1">
-                        <p class="font-semibold text-nova-green-dark text-base">${log.action || 'Acción Desconocida'}</p>
-                        <p class="text-xs text-gray-500">${logDate}</p>
-                    </div>
-                    <p class="text-xs text-gray-600 mb-1">${userDetails}</p>
-                    <div class="mt-1 border-t border-gray-300 pt-1">
-                        ${formattedDetails}
-                    </div>
-                </li>
-            `;
-        });
-        historyHTML += '</ul>';
-        historyModalContent.innerHTML = historyHTML;
+        try {
+            const historySnapshot = await db.collection("inventoryItems").doc(itemId)
+                .collection("history")
+                .orderBy("timestamp", "desc")
+                .get();
 
-    } catch (error) {
-        console.error(`Error loading history for item ${itemId}:`, error);
-        historyModalContent.innerHTML = `<p class="text-red-500 p-4">Error al cargar el historial: ${error.message}</p>`;
+            if (historySnapshot.empty) {
+                historyModalContent.innerHTML = '<p class="text-nova-gray p-4">No hay historial registrado para este ítem.</p>';
+                return;
+            }
+
+            let historyHTML = '<ul class="space-y-4 text-left">';
+            historySnapshot.forEach(doc => {
+                const log = doc.data();
+                const logDate = log.timestamp ? new Date(log.timestamp.seconds * 1000).toLocaleString('es-CO', { dateStyle: 'long', timeStyle: 'medium' }) : 'Fecha desconocida';
+                const userDetails = `Usuario: ${log.userName || 'N/A'} ${log.userApellidos || ''} (Cédula: ${log.userCedula || 'N/A'})`;
+                const formattedDetails = formatLogDetails(log); // Use the helper function
+
+                historyHTML += `
+                    <li class="p-3 bg-nova-gray-light rounded-lg shadow-sm border border-gray-200">
+                        <div class="flex justify-between items-center mb-1">
+                            <p class="font-semibold text-nova-green-dark text-base">${log.action || 'Acción Desconocida'}</p>
+                            <p class="text-xs text-gray-500">${logDate}</p>
+                        </div>
+                        <p class="text-xs text-gray-600 mb-1">${userDetails}</p>
+                        <div class="mt-1 border-t border-gray-300 pt-1">
+                            ${formattedDetails}
+                        </div>
+                    </li>
+                `;
+            });
+            historyHTML += '</ul>';
+            historyModalContent.innerHTML = historyHTML;
+
+        } catch (error) {
+            console.error(`Error loading history for item ${itemId}:`, error);
+            historyModalContent.innerHTML = `<p class="text-red-500 p-4">Error al cargar el historial: ${error.message}</p>`;
+        }
     }
-}
 
 }); // End DOMContentLoaded
