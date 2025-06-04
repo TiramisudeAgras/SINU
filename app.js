@@ -627,9 +627,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         const itemId = e.target.dataset.itemId;
                         const siteId = e.target.dataset.siteId;
                         const siteName = e.target.dataset.siteName;
-                        const itemName = e.target.dataset.itemName;
-                        const currentQuantity = parseFloat(e.target.dataset.currentQuantity);
-                        renderAdjustQuantityForm(itemId, itemName, currentQuantity, siteId, siteName);
                         console.log("Edit item clicked:", itemId);
                         
                         try {
