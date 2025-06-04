@@ -727,6 +727,13 @@ async function renderTransferItemForm(itemId, itemData, sourceSiteId, sourceSite
 
     transferItemModal.classList.remove('hidden');
     if(quantityToTransferEl) quantityToTransferEl.focus();
+
+    // Reset submit button state
+    const submitButton = transferItemForm.querySelector('button[type="submit"]');
+    if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.textContent = "Transferir"; // Or whatever your default text is
+    }
 }
 
     // app.js - Add this new function
