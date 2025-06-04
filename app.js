@@ -70,6 +70,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const adjustItemCurrentQuantityInput = document.getElementById('adjust-item-current-quantity'); // Hidden input to store numeric current quantity
     const currentItemQuantityDisplay = document.getElementById('current-item-quantity-display'); // Readonly display field
 
+    // app.js - Add these to your DOM Element References section
+    const transferItemModal = document.getElementById('transfer-item-modal');
+    const transferItemForm = document.getElementById('transfer-item-form');
+    const transferItemModalTitle = document.getElementById('transfer-item-modal-title'); // Though title is static
+    const transferItemNameDisplay = document.getElementById('transfer-item-name-display');
+    const transferItemSiteOriginDisplay = document.getElementById('transfer-item-site-origin-display');
+    const cancelTransferItemButton = document.getElementById('cancel-transfer-item-button');
+    const transferItemIdInput = document.getElementById('transfer-item-id');
+    const transferSourceSiteIdInput = document.getElementById('transfer-source-site-id');
+    const transferSourceSiteNameInput = document.getElementById('transfer-source-site-name');
+    const transferItemCurrentQuantityInput = document.getElementById('transfer-item-current-quantity');
+    const transferSourceItemDataJsonInput = document.getElementById('transfer-source-item-data-json');
+    const transferCurrentQuantityDisplay = document.getElementById('transfer-current-quantity-display');
+    const destinationSiteIdSelect = document.getElementById('destination-site-id');
+
 
     // --- Initial Page Setup ---
     if (currentYearSpan) {
@@ -645,10 +660,27 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 });
                 document.querySelectorAll('.transfer-item-btn').forEach(button => {
-                    button.addEventListener('click', (e) => { 
-                        alert(`Transferir ítem: ${e.target.dataset.itemId} (Funcionalidad pendiente)`); // UI Text
-                    });
+                button.addEventListener('click', async (e) => { // Make async
+                    const itemId = e.target.dataset.itemId;
+                    const siteId = e.target.dataset.siteId; // This is the source siteId
+                    const siteName = e.target.dataset.siteName; // Source siteName
+                    console.log("Transfer item clicked:", itemId);
+
+                    try {
+                        const itemDocRef = db.collection("inventoryItems").doc(itemId);
+                        const itemDoc = await itemDocRef.get();
+                        if (itemDoc.exists) {
+                            renderTransferItemForm(itemId, itemDoc.data(), siteId, siteName);
+                        } else {
+                            console.error("Item not found for transfer:", itemId);
+                            alert("Error: No se encontró el ítem para transferir."); // UI Text
+                        }
+                    } catch (error) {
+                        console.error("Error fetching item for transfer:", error);
+                        alert("Error al cargar datos del ítem para transferir."); // UI Text
+                    }
                 });
+            });
             }
             document.querySelectorAll('.view-history-btn').forEach(button => {
                 button.addEventListener('click', (e) => {
@@ -675,6 +707,62 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     }
+
+    // app.js - Add this new function
+async function renderTransferItemForm(itemId, itemData, sourceSiteId, sourceSiteName) {
+    if (!transferItemModal || !transferItemForm || currentUserRole !== 'oficina') {
+        console.warn("Attempt to render transfer form denied or modal elements missing.");
+        return;
+    }
+
+    console.log(`Rendering transfer form for item: ${itemData.itemName} (ID: ${itemId}) from site: ${sourceSiteName}`);
+
+    // Store item and source site info in hidden inputs
+    if(transferItemIdInput) transferItemIdInput.value = itemId;
+    if(transferSourceSiteIdInput) transferSourceSiteIdInput.value = sourceSiteId;
+    if(transferSourceSiteNameInput) transferSourceSiteNameInput.value = sourceSiteName;
+    if(transferItemCurrentQuantityInput) transferItemCurrentQuantityInput.value = itemData.quantity;
+    if(transferSourceItemDataJsonInput) transferSourceItemDataJsonInput.value = JSON.stringify(itemData);
+
+
+    // Display item info
+    const escapedItemName = itemData.itemName ? itemData.itemName.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : 'Ítem Desconocido';
+    if(transferItemNameDisplay) transferItemNameDisplay.textContent = `Ítem: ${escapedItemName}`;
+    if(transferItemSiteOriginDisplay) transferItemSiteOriginDisplay.textContent = `Desde Obra: ${sourceSiteName}`;
+    if(transferCurrentQuantityDisplay) transferCurrentQuantityDisplay.value = itemData.quantity;
+
+    // Clear previous form values and errors
+    const quantityToTransferEl = transferItemForm.elements['quantityToTransfer'];
+    const destinationSiteEl = transferItemForm.elements['destinationSiteId'];
+    const transferReasonEl = transferItemForm.elements['transferReason'];
+    const errorElement = document.getElementById('transfer-item-error');
+
+    if(quantityToTransferEl) quantityToTransferEl.value = '';
+    if(quantityToTransferEl) quantityToTransferEl.max = itemData.quantity; // Set max based on current quantity
+    if(destinationSiteEl) destinationSiteEl.innerHTML = '<option value="">Cargando destinos...</option>'; // Clear previous options
+    if(transferReasonEl) transferReasonEl.value = '';
+    if(errorElement) errorElement.textContent = '';
+
+    // Populate destination sites dropdown
+    try {
+        const sitesSnapshot = await db.collection("constructionSites").orderBy("name", "asc").get();
+        let optionsHTML = '<option value="">Seleccione obra de destino...</option>';
+        sitesSnapshot.forEach(doc => {
+            if (doc.id !== sourceSiteId) { // Exclude the source site
+                const site = doc.data();
+                const escapedOptionSiteName = site.name.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+                optionsHTML += `<option value="<span class="math-inline">\{doc\.id\}"\></span>{escapedOptionSiteName}</option>`;
+            }
+        });
+        if(destinationSiteEl) destinationSiteEl.innerHTML = optionsHTML;
+    } catch (error) {
+        console.error("Error loading destination sites:", error);
+        if(destinationSiteEl) destinationSiteEl.innerHTML = '<option value="">Error al cargar obras</option>';
+    }
+
+    transferItemModal.classList.remove('hidden');
+    if(quantityToTransferEl) quantityToTransferEl.focus();
+}
 
     // app.js - Add this new function
     function renderAdjustQuantityForm(itemId, itemName, currentQuantity, siteId, siteName) {
@@ -934,6 +1022,160 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // app.js - Add these inside DOMContentLoaded
+    if (transferItemForm) {
+        transferItemForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const itemId = transferItemIdInput.value;
+            const sourceSiteId = transferSourceSiteIdInput.value;
+            const sourceSiteName = transferSourceSiteNameInput.value;
+            const sourceItemData = JSON.parse(transferSourceItemDataJsonInput.value || '{}');
+            // currentQuantity is also stored in a hidden field, or can be from sourceItemData.quantity
+            await handleTransferItemSubmit(event, itemId, sourceItemData, sourceSiteId, sourceSiteName);
+        });
+    }
+
+    if (cancelTransferItemButton && transferItemModal) {
+        cancelTransferItemButton.addEventListener('click', () => {
+            transferItemModal.classList.add('hidden');
+        });
+        transferItemModal.addEventListener('click', (event) => {
+            if (event.target === transferItemModal) {
+                transferItemModal.classList.add('hidden');
+            }
+        });
+    }
+
+
+// app.js - Add this new function
+async function handleTransferItemSubmit(event, itemId, sourceItemData, sourceSiteId, sourceSiteName) {
+    if (currentUserRole !== 'oficina') {
+        console.warn("Attempt to transfer item by non-oficina role blocked.");
+        return;
+    }
+
+    const form = event.target;
+    const quantityToTransferStr = form.elements['quantityToTransfer'].value;
+    const destinationSiteId = form.elements['destinationSiteId'].value;
+    const reason = form.elements['transferReason'].value.trim();
+
+    const errorElement = document.getElementById('transfer-item-error');
+    if(errorElement) errorElement.textContent = '';
+
+    // Validation
+    if (!quantityToTransferStr || !destinationSiteId) {
+        if(errorElement) errorElement.textContent = 'Cantidad a transferir y obra de destino son obligatorios.';
+        return;
+    }
+    const quantityToTransfer = parseFloat(quantityToTransferStr);
+    if (isNaN(quantityToTransfer) || quantityToTransfer <= 0) {
+        if(errorElement) errorElement.textContent = 'La cantidad a transferir debe ser un número positivo.';
+        return;
+    }
+    if (quantityToTransfer > sourceItemData.quantity) {
+        if(errorElement) errorElement.textContent = `No puede transferir más de la cantidad actual (${sourceItemData.quantity}).`;
+        return;
+    }
+
+    const user = auth.currentUser;
+    if (!user) {
+        if(errorElement) errorElement.textContent = 'Error de autenticación.'; return;
+    }
+
+    const submitButton = form.querySelector('button[type="submit"]');
+    const originalButtonText = submitButton.textContent;
+    submitButton.disabled = true;
+    submitButton.textContent = 'Transfiriendo...';
+
+    try {
+        // Fetch performing user's details for logs
+        let performingUserName = "Usuario Desconocido", performingUserApellidos = "", performingUserCedula = "";
+        const userProfileSnap = await db.collection("users").doc(user.uid).get();
+        if (userProfileSnap.exists) {
+            const d = userProfileSnap.data();
+            performingUserName = d.nombre || performingUserName;
+            performingUserApellidos = d.apellidos || "";
+            performingUserCedula = d.cedula || "";
+        }
+
+        const destinationSiteDoc = await db.collection("constructionSites").doc(destinationSiteId).get();
+        const destinationSiteName = destinationSiteDoc.exists ? destinationSiteDoc.data().name : "Destino Desconocido";
+
+        const batch = db.batch(); // Use a batch for atomic operations
+        const timestamp = firebase.firestore.FieldValue.serverTimestamp();
+
+        // 1. Update Source Item
+        const sourceItemRef = db.collection("inventoryItems").doc(itemId);
+        const newSourceQuantity = sourceItemData.quantity - quantityToTransfer;
+        batch.update(sourceItemRef, {
+            quantity: newSourceQuantity,
+            lastUpdatedAt: timestamp
+        });
+
+        // Log TRANSFERENCIA_SALIDA for source item
+        const sourceHistoryRef = sourceItemRef.collection("history").doc();
+        batch.set(sourceHistoryRef, {
+            timestamp: timestamp, userId: user.uid, userName: performingUserName, userApellidos: performingUserApellidos, userCedula: performingUserCedula,
+            action: "TRANSFERENCIA_SALIDA",
+            details: {
+                quantityTransferred: quantityToTransfer,
+                remainingQuantityAtSource: newSourceQuantity,
+                toSiteId: destinationSiteId,
+                toSiteName: destinationSiteName,
+                reason: reason || "N/A",
+                notes: `Transferencia de ${quantityToTransfer} <span class="math-inline">\{sourceItemData\.unit \|\| ''\} de "</span>{sourceItemData.itemName}" desde "<span class="math-inline">\{sourceSiteName\}" hacia "</span>{destinationSiteName}".`
+            }
+        });
+
+        // 2. Create New Item at Destination Site
+        // (Simplified: always create a new item record at the destination for the transferred quantity)
+        const destinationItemRef = db.collection("inventoryItems").doc(); // New ID for the item at destination
+        batch.set(destinationItemRef, {
+            itemName: sourceItemData.itemName,
+            unit: sourceItemData.unit,
+            serialModel: sourceItemData.serialModel, // Copy details
+            condition: sourceItemData.condition,   // Copy details
+            description: sourceItemData.description, // Copy details
+            quantity: quantityToTransfer,
+            initialQuantity: quantityToTransfer, // This is its initial quantity at this new location
+            siteId: destinationSiteId,
+            createdBy: user.uid, // User performing the transfer
+            createdAt: timestamp, // When this specific batch arrived/created at new site
+            lastUpdatedAt: timestamp,
+            status: sourceItemData.status || "Disponible", // Copy status or set default
+            transferredFromItemId: itemId, // Optional: link back to original item ID
+            transferredFromSiteId: sourceSiteId // Optional: link back to original site ID
+        });
+
+        // Log CREA_POR_TRANSFERENCIA for the new item at the destination
+        const destinationHistoryRef = destinationItemRef.collection("history").doc();
+        batch.set(destinationHistoryRef, {
+            timestamp: timestamp, userId: user.uid, userName: performingUserName, userApellidos: performingUserApellidos, userCedula: performingUserCedula,
+            action: "CREADO_POR_TRANSFERENCIA",
+            details: {
+                quantityReceived: quantityToTransfer,
+                unit: sourceItemData.unit,
+                fromSiteId: sourceSiteId,
+                fromSiteName: sourceSiteName,
+                reason: reason || "N/A",
+                notes: `Recepción de ${quantityToTransfer} <span class="math-inline">\{sourceItemData\.unit \|\| ''\} de "</span>{sourceItemData.itemName}" desde "${sourceSiteName}".`
+            }
+        });
+
+        await batch.commit(); // Commit all operations
+
+        console.log("Item transferred successfully. Source item updated, new item created at destination, history logged.");
+        if(transferItemModal) transferItemModal.classList.add('hidden');
+        loadInventoryItems(sourceSiteId, sourceSiteName); // Refresh current site's inventory
+
+    } catch (error) {
+        console.error("Error transferring item:", error);
+        if(errorElement) errorElement.textContent = `Error al transferir ítem: ${error.message}`;
+        submitButton.disabled = false;
+        submitButton.textContent = originalButtonText;
+    }
+}
+
     // app.js - Add this new function
 async function handleAdjustQuantitySubmit(event, itemId, oldQuantity, siteId, siteName, itemName) {
     if (currentUserRole !== 'oficina') {
@@ -1157,6 +1399,32 @@ async function handleAdjustQuantitySubmit(event, itemId, oldQuantity, siteId, si
                 }
                 if (log.details.notes) {
                     detailsHTML += `<li><span class="font-medium text-gray-700">Notas:</span> ${log.details.notes}</li>`;
+                }
+                break;
+            case "TRANSFERENCIA_SALIDA":
+                detailsHTML += `<li><span class="font-medium text-gray-700">Cantidad Transferida:</span> ${log.details.quantityTransferred !== undefined ? log.details.quantityTransferred : 'N/A'}</li>`;
+                detailsHTML += `<li><span class="font-medium text-gray-700">Hacia Obra:</span> ${log.details.toSiteName || 'Desconocida'} (ID: ${log.details.toSiteId || 'N/A'})</li>`;
+                if (log.details.remainingQuantityAtSource !== undefined) {
+                    detailsHTML += `<li><span class="font-medium text-gray-700">Cantidad Restante en Origen:</span> ${log.details.remainingQuantityAtSource}</li>`;
+                }
+                if (log.details.reason) {
+                    detailsHTML += `<li><span class="font-medium text-gray-700">Motivo/Notas:</span> ${log.details.reason}</li>`;
+                }
+                if (log.details.notes) { // General notes field if used
+                    detailsHTML += `<li><span class="font-medium text-gray-700">Detalle Adicional:</span> ${log.details.notes}</li>`;
+                }
+                break;
+            case "CREADO_POR_TRANSFERENCIA": // Or "TRANSFERENCIA_ENTRADA" if you prefer
+                detailsHTML += `<li><span class="font-medium text-gray-700">Cantidad Recibida:</span> ${log.details.quantityReceived !== undefined ? log.details.quantityReceived : 'N/A'}</li>`;
+                detailsHTML += `<li><span class="font-medium text-gray-700">Desde Obra:</span> ${log.details.fromSiteName || 'Desconocida'} (ID: ${log.details.fromSiteId || 'N/A'})</li>`;
+                if (log.details.unit) {
+                    detailsHTML += `<li><span class="font-medium text-gray-700">Unidad:</span> ${log.details.unit}</li>`;
+                }
+                if (log.details.reason) {
+                    detailsHTML += `<li><span class="font-medium text-gray-700">Motivo/Notas de Recepción:</span> ${log.details.reason}</li>`;
+                }
+                if (log.details.notes) { // General notes field if used
+                    detailsHTML += `<li><span class="font-medium text-gray-700">Detalle Adicional:</span> ${log.details.notes}</li>`;
                 }
                 break;
             // Add other cases here for "CANTIDAD_AJUSTADA", "TRANSFERENCIA_SALIDA", etc. in the future

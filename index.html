@@ -208,6 +208,61 @@
         </div>
     </div>
 
+    <div id="transfer-item-modal" class="fixed inset-0 bg-gray-800 bg-opacity-75 overflow-y-auto h-full w-full flex items-center justify-center hidden z-50 p-4">
+        <div class="relative mx-auto p-5 sm:p-6 border w-full max-w-lg shadow-lg rounded-md bg-white">
+            <form id="transfer-item-form">
+                <h3 class="text-xl leading-6 font-bold text-nova-green-dark text-center mb-2" id="transfer-item-modal-title">Transferir Ítem de Inventario</h3>
+                <p class="text-sm text-center text-nova-gray-dark mb-1" id="transfer-item-name-display">Ítem: </p>
+                <p class="text-xs text-center text-nova-gray-dark mb-4" id="transfer-item-site-origin-display">Desde: </p>
+                
+                <input type="hidden" id="transfer-item-id">
+                <input type="hidden" id="transfer-source-site-id">
+                <input type="hidden" id="transfer-source-site-name">
+                <input type="hidden" id="transfer-item-current-quantity">
+                <input type="hidden" id="transfer-source-item-data-json">
+
+
+                <div class="space-y-4 max-h-[60vh] sm:max-h-[70vh] overflow-y-auto pr-2 mb-6">
+                    <div>
+                        <label for="transfer-current-quantity-display" class="block text-sm font-medium text-nova-gray-dark">Cantidad Actual en Origen</label>
+                        <input type="text" id="transfer-current-quantity-display" readonly
+                               class="mt-1 block w-full px-3 py-2 border-gray-300 bg-gray-100 rounded-md shadow-sm sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="quantity-to-transfer" class="block text-sm font-medium text-nova-gray-dark">Cantidad a Transferir</label>
+                        <input type="number" id="quantity-to-transfer" name="quantityToTransfer" required min="0.01" step="any"
+                               class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="destination-site-id" class="block text-sm font-medium text-nova-gray-dark">Obra de Destino</label>
+                        <select id="destination-site-id" name="destinationSiteId" required
+                                class="mt-1 block w-full px-3 py-2 border border-nova-gray bg-white rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
+                            <option value="">Seleccione obra de destino...</option>
+                            </select>
+                    </div>
+                    <div>
+                        <label for="transfer-reason" class="block text-sm font-medium text-nova-gray-dark">Motivo/Notas de la Transferencia (Opcional)</label>
+                        <input type="text" id="transfer-reason" name="transferReason" placeholder="Ej: Traslado para nueva fase"
+                               class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
+                    </div>
+                </div>
+
+                <p id="transfer-item-error" class="my-2 text-center text-sm text-red-600"></p>
+                
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button type="button" id="cancel-transfer-item-button"
+                            class="px-4 py-2 bg-gray-200 text-gray-700 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-colors duration-150">
+                        Cancelar
+                    </button>
+                    <button type="submit"
+                            class="px-4 py-2 bg-nova-green hover:bg-nova-green-dark text-white text-base font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nova-green transition-colors duration-150">
+                        Confirmar Transferencia
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
 
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
