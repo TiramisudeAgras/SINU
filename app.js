@@ -866,11 +866,7 @@ const firebaseConfig = {
         const errEl = document.getElementById('edit-item-error'); if(errEl) errEl.textContent = '';
         editItemModal.classList.remove('hidden');
     }
-    if (editItemForm) editItemForm.addEventListener('submit', async e => {
-        e.preventDefault(); const itemId = editItemIdInput.value; const siteId = editItemSiteIdInput.value; const siteName = editItemSiteNameInput.value;
-        const oldData = JSON.parse(e.target.dataset.oldData || '{}');
-        await handleEditItemSubmit(e, itemId, oldData, siteId, siteName);
-    });
+   
     if (cancelEditItemButton && editItemModal) cancelEditItemButton.addEventListener('click', () => editItemModal.classList.add('hidden'));
     if (editItemModal) editItemModal.addEventListener('click', e => { if (e.target === editItemModal) editItemModal.classList.add('hidden'); });
 
