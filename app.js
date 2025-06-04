@@ -900,7 +900,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 userName: pUserName,
                 userApellidos: pUserApellidos,
                 userCedula: pUserCedula,
-                action: "Item Modificado", // <-- changed here
+                action: "ITEM_ACTUALIZADO",
                 details: { changedFields: Object.keys(changes), oldValues: oldVals, newValues: newVals, notes: `Ítem "${updated.itemName}" actualizado.`}
             });
             console.log("Item updated:", itemId); 
