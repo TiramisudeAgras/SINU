@@ -15,13 +15,13 @@ const firebaseConfig = {
   measurementId: "G-LZ4R7S6EPG"
 };
 
- // Initialize Firebase
+     // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
     // -- END: Firebase Configuration --
 
-    let currentUserRole = null; // Stores the role of the logged-in user
+    let currentUserRole = null;
 
     // --- DOM Element References ---
     const authSection = document.getElementById('auth-section');
@@ -43,6 +43,12 @@ const firebaseConfig = {
     const inventoryListContainer = document.getElementById('inventory-list');
     const addItemFormContainer = document.getElementById('add-item-form-container');
 
+    // History Modal Elements
+    const historyModal = document.getElementById('history-modal');
+    const historyModalTitle = document.getElementById('history-modal-title');
+    const historyModalContent = document.getElementById('history-modal-content');
+    const closeHistoryModalButton = document.getElementById('close-history-modal-button');
+
 
     // --- Initial Page Setup ---
     if (currentYearSpan) {
@@ -55,21 +61,20 @@ const firebaseConfig = {
         dashboardSection.classList.add('hidden');
     }
 
-    function showSitesView() { // New function to specifically show sites view
+    function showSitesView() {
         sitesSection.classList.remove('hidden');
         inventorySection.classList.add('hidden');
         if (selectedSiteNameSpan) selectedSiteNameSpan.textContent = '';
-        if (inventoryListContainer) inventoryListContainer.innerHTML = '';
+        if (inventoryListContainer) inventoryListContainer.innerHTML = '<p class="text-nova-gray p-4">Cargando inventario...</p>';
         if (addItemFormContainer) addItemFormContainer.innerHTML = '';
-        renderAddSiteButton(); // Ensure correct button state for adding sites
+        renderAddSiteButton();
     }
     
-    function showDashboardSection() { // Modified to call showSitesView by default
+    function showDashboardSection() {
         authSection.classList.add('hidden');
         dashboardSection.classList.remove('hidden');
-        showSitesView(); // Default to sites view
+        showSitesView();
     }
-
 
     // --- Authentication State Observer ---
     auth.onAuthStateChanged(async user => {
@@ -86,15 +91,13 @@ const firebaseConfig = {
                     currentUserRole = (userData.roles && userData.roles.length > 0) ? userData.roles[0] : 'espectador';
                     console.log("User is approved. Role:", currentUserRole);
                     
-                    // Update dashboard title with user's name
-                    const userName = (userData.nombre && userData.apellidos) 
+                    const userNameDisplay = (userData.nombre && userData.apellidos) 
                                      ? `${userData.nombre} ${userData.apellidos}` 
-                                     : user.email || 'Usuario'; // Fallback to email or generic "Usuario"
-                    if(dashboardTitle) dashboardTitle.textContent = `Panel de ${userName} (${currentUserRole})`;
+                                     : user.email || 'Usuario';
+                    if(dashboardTitle) dashboardTitle.textContent = `Panel de ${userNameDisplay} (${currentUserRole})`;
                     
-                    showDashboardSection(); // This will now default to sites view
+                    showDashboardSection();
                     loadConstructionSites();
-                    // renderAddSiteButton(); // This is now called by showSitesView or when returning to it
                 } else {
                     console.log("User is NOT approved or profile doesn't exist yet.");
                     currentUserRole = null; 
@@ -211,7 +214,7 @@ const firebaseConfig = {
         }
     }
 
-    // --- Render Signup Form (with example text and consent) ---
+    // --- Render Signup Form ---
     function renderSignupForm() {
         if (!loginFormContainer) return;
         if(authTitle) authTitle.textContent = 'Crear Nueva Cuenta';
@@ -367,7 +370,6 @@ const firebaseConfig = {
 
     // --- Helper for Firebase Auth Error Messages ---
     function getFirebaseAuthErrorMessage(error) {
-        // (Same as before)
         switch (error.code) {
             case 'auth/invalid-email': return 'El formato del correo electrónico no es válido.';
             case 'auth/user-disabled': return 'Este usuario ha sido deshabilitado.';
@@ -488,7 +490,7 @@ const firebaseConfig = {
 
         try {
             const sitesSnapshot = await db.collection("constructionSites")
-                                          .orderBy("createdAt", "desc")
+                                          .orderBy("createdAt", "desc") // Keep this or change to itemName if preferred
                                           .get();
             if (sitesSnapshot.empty) {
                 sitesListContainer.innerHTML = '<p class="text-nova-gray p-4">No hay obras registradas en el sistema.</p>';
@@ -514,7 +516,7 @@ const firebaseConfig = {
             document.querySelectorAll('#sites-list li').forEach(item => {
                 item.addEventListener('click', () => {
                     const siteId = item.dataset.siteId;
-                    const siteName = item.dataset.siteName; // This is the escaped name
+                    const siteName = item.dataset.siteName;
                     showInventoryForSite(siteId, siteName);
                 });
             });
@@ -524,12 +526,12 @@ const firebaseConfig = {
         }
     }
 
-    // --- Inventory UI Transition and Placeholder Functions ---
+    // --- Inventory UI Transition and Item Functions ---
     function showInventoryForSite(siteId, siteName) {
         console.log(`Attempting to show inventory for site: ${siteName} (ID: ${siteId})`);
         if (sitesSection) sitesSection.classList.add('hidden');
         if (inventorySection) inventorySection.classList.remove('hidden');
-        if (selectedSiteNameSpan) selectedSiteNameSpan.textContent = siteName; // Use the (potentially escaped) siteName
+        if (selectedSiteNameSpan) selectedSiteNameSpan.textContent = siteName;
 
         loadInventoryItems(siteId, siteName); 
         renderAddInventoryItemButton(siteId, siteName);
@@ -537,30 +539,317 @@ const firebaseConfig = {
 
     if (backToSitesButton) {
         backToSitesButton.addEventListener('click', () => {
-            if (inventorySection) inventorySection.classList.add('hidden');
-            if (sitesSection) sitesSection.classList.remove('hidden');
-            if (selectedSiteNameSpan) selectedSiteNameSpan.textContent = '';
-            if (inventoryListContainer) inventoryListContainer.innerHTML = '';
-            if (addItemFormContainer) addItemFormContainer.innerHTML = '';
-            renderAddSiteButton(); 
+            showSitesView(); 
         });
     }
 
     async function loadInventoryItems(siteId, siteName) {
-        console.log(`Placeholder: loadInventoryItems called for siteId: ${siteId}, siteName: ${siteName}`);
-        if (inventoryListContainer) {
-            inventoryListContainer.innerHTML = `<p class="text-nova-gray p-4">Cargando inventario para ${siteName}...</p>`;
+        if (!inventoryListContainer) {
+            console.error("Inventory list container not found");
+            return;
         }
-        // Actual loading logic will go here in the next step
+        inventoryListContainer.innerHTML = `<p class="text-nova-gray p-4">Cargando inventario para ${siteName}...</p>`;
+        const user = auth.currentUser;
+        if (!user) {
+            inventoryListContainer.innerHTML = '<p class="text-red-500 p-4">Error: Usuario no autenticado.</p>';
+            return;
+        }
+        try {
+            const inventorySnapshot = await db.collection("inventoryItems")
+                                              .where("siteId", "==", siteId)
+                                              .orderBy("itemName", "asc") // Order by item name
+                                              .get();
+            if (inventorySnapshot.empty) {
+                inventoryListContainer.innerHTML = `<p class="text-nova-gray p-4">No hay ítems de inventario para esta obra (${siteName}).</p>`;
+                return;
+            }
+            let itemsHTML = '<ul class="space-y-3">';
+            inventorySnapshot.forEach(doc => {
+                const item = doc.data();
+                const itemId = doc.id;
+                const escapedItemName = item.itemName ? item.itemName.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : 'Ítem sin nombre';
+                const escapedUnit = item.unit ? item.unit.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : '';
+                const escapedSerialModel = item.serialModel ? item.serialModel.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : 'N/A';
+                const escapedCondition = item.condition ? item.condition.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : 'N/A';
+                const escapedDescription = item.description ? item.description.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : '';
+                
+                itemsHTML += `
+                    <li class="bg-white p-4 rounded-lg shadow border border-nova-gray-light transition-shadow hover:shadow-md" data-item-id="${itemId}">
+                        <div class="flex justify-between items-start flex-wrap">
+                            <div class="flex-grow pr-4 mb-2 sm:mb-0">
+                                <h5 class="text-lg font-semibold text-nova-green-dark">${escapedItemName}</h5>
+                                <p class="text-sm text-nova-gray-dark">Cantidad: <span class="font-medium text-black">${item.quantity !== undefined ? item.quantity : 'N/A'}</span> ${escapedUnit}</p>
+                                <p class="text-sm text-nova-gray-dark">Serial/Modelo: <span class="font-medium text-black">${escapedSerialModel}</span></p>
+                                <p class="text-sm text-nova-gray-dark">Estado: <span class="font-medium text-black">${escapedCondition}</span></p>
+                                ${escapedDescription ? `<p class="mt-1 text-xs text-gray-500 w-full">Obs: ${escapedDescription}</p>` : ''}
+                            </div>
+                            <div class="flex space-x-2 mt-2 sm:mt-0 flex-shrink-0 flex-wrap gap-2 items-start">
+                                ${currentUserRole === 'oficina' ? `
+                                    <button class="edit-item-btn text-xs bg-blue-500 hover:bg-blue-600 text-white py-1 px-2 rounded" data-item-id="${itemId}" data-site-id="${siteId}" data-site-name="${siteName}">Editar</button>
+                                    <button class="transfer-item-btn text-xs bg-yellow-500 hover:bg-yellow-600 text-black py-1 px-2 rounded" data-item-id="${itemId}" data-site-id="${siteId}" data-site-name="${siteName}">Transferir</button>
+                                ` : ''}
+                                <button class="view-history-btn text-xs bg-gray-400 hover:bg-gray-500 text-white py-1 px-2 rounded" data-item-id="${itemId}" data-item-name="${escapedItemName}">Historial</button>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-2 w-full text-right">Añadido: ${item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleDateString() : 'N/A'}</p>
+                    </li>
+                `;
+            });
+            itemsHTML += '</ul>';
+            inventoryListContainer.innerHTML = itemsHTML;
+
+            if (currentUserRole === 'oficina') {
+                document.querySelectorAll('.edit-item-btn').forEach(button => {
+                    button.addEventListener('click', (e) => { alert(`Editar ítem: ${e.target.dataset.itemId} (Funcionalidad pendiente)`); });
+                });
+                document.querySelectorAll('.transfer-item-btn').forEach(button => {
+                    button.addEventListener('click', (e) => { alert(`Transferir ítem: ${e.target.dataset.itemId} (Funcionalidad pendiente)`); });
+                });
+            }
+            document.querySelectorAll('.view-history-btn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const itemId = e.target.dataset.itemId;
+                    const itemName = e.target.dataset.itemName;
+                    showItemHistory(itemId, itemName);
+                });
+            });
+        } catch (error) {
+            console.error(`Error loading inventory items for site ${siteId}:`, error);
+            inventoryListContainer.innerHTML = `<p class="text-red-500 p-4">Error al cargar el inventario: ${error.message}</p>`;
+            if (error.message.includes("index")) {
+                inventoryListContainer.innerHTML += `<p class="text-sm text-red-400 p-4">Es posible que necesite crear un índice compuesto en Firestore. Revise la consola de Firebase para ver el enlace de creación del índice si está disponible en el mensaje de error original.</p>`;
+            }
+        }
     }
 
     function renderAddInventoryItemButton(siteId, siteName) {
-        console.log(`Placeholder: renderAddInventoryItemButton called for siteId: ${siteId}`);
-        if (addItemFormContainer && currentUserRole === 'oficina') {
-            addItemFormContainer.innerHTML = `<button id="show-add-item-form-btn" class="mb-4 bg-nova-green hover:bg-nova-green-dark text-white font-bold py-2 px-4 rounded transition-colors duration-150">+ Añadir Ítem de Inventario</button>`;
-            // We'll add event listener for this button later to call renderAddInventoryItemForm
-        } else if (addItemFormContainer) {
-            addItemFormContainer.innerHTML = ''; // Clear for non-oficina roles or if container is missing role check
+        if (!addItemFormContainer) return;
+        if (currentUserRole === 'oficina') {
+            addItemFormContainer.innerHTML = `
+                <button id="show-add-item-form-btn" class="bg-nova-green hover:bg-nova-green-dark text-white font-bold py-2 px-4 rounded transition-colors duration-150">
+                    + Añadir Ítem de Inventario
+                </button>
+            `;
+            const showButton = document.getElementById('show-add-item-form-btn');
+            if (showButton) {
+                showButton.addEventListener('click', () => renderAddInventoryItemForm(siteId, siteName));
+            }
+        } else {
+            addItemFormContainer.innerHTML = '';
+        }
+    }
+
+    function renderAddInventoryItemForm(siteId, siteName) {
+        if (!addItemFormContainer || currentUserRole !== 'oficina') {
+            if(addItemFormContainer) addItemFormContainer.innerHTML = ''; return;
+        }
+        const escapedSiteName = siteName.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+        addItemFormContainer.innerHTML = `
+            <form id="add-inventory-item-form" class="space-y-4 bg-nova-gray-light p-4 rounded-md shadow-inner mb-6">
+                <h4 class="text-lg font-semibold text-nova-green-dark mb-3">Añadir Nuevo Ítem a: ${escapedSiteName}</h4>
+                <div>
+                    <label for="item-name" class="block text-sm font-medium text-nova-gray-dark">Equipo/Maquinaria (Nombre del Ítem)</label>
+                    <input type="text" id="item-name" name="itemName" required
+                           class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label for="item-quantity" class="block text-sm font-medium text-nova-gray-dark">Cantidad Actual (Inicial)</label>
+                        <input type="number" id="item-quantity" name="itemQuantity" required min="0" step="any" 
+                               class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="item-unit" class="block text-sm font-medium text-nova-gray-dark">Unidad</label>
+                        <input type="text" id="item-unit" name="itemUnit" required placeholder="Ej: bolsas, kg, mts, und."
+                               class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="item-serial-model" class="block text-sm font-medium text-nova-gray-dark">Serial/Modelo</label>
+                        <input type="text" id="item-serial-model" name="itemSerialModel"
+                               class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
+                    </div>
+                </div>
+                <div>
+                    <label for="item-condition" class="block text-sm font-medium text-nova-gray-dark">Estado</label>
+                    <input type="text" id="item-condition" name="itemCondition" placeholder="Ej: Buen Estado, Por Reparar"
+                           class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
+                </div>
+                <div>
+                    <label for="item-description" class="block text-sm font-medium text-nova-gray-dark">Observaciones</label>
+                    <textarea id="item-description" name="itemDescription" rows="2"
+                              class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"></textarea>
+                </div>
+                <div class="flex space-x-3 pt-2">
+                    <button type="submit"
+                            class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-nova-green hover:bg-nova-green-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nova-green-dark transition-colors duration-150">
+                        Guardar Ítem
+                    </button>
+                    <button type="button" id="cancel-add-item"
+                            class="w-full flex justify-center py-2 px-4 border border-nova-gray rounded-md shadow-sm text-sm font-medium text-nova-gray-dark bg-white hover:bg-nova-gray-light focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nova-gray transition-colors duration-150">
+                        Cancelar
+                    </button>
+                </div>
+                <p id="add-item-error" class="mt-2 text-center text-sm text-red-600"></p>
+            </form>
+        `;
+        const addInventoryItemForm = document.getElementById('add-inventory-item-form');
+        const cancelAddItemButton = document.getElementById('cancel-add-item');
+        if (addInventoryItemForm) addInventoryItemForm.addEventListener('submit', (event) => handleAddInventoryItemSubmit(event, siteId, siteName));
+        if (cancelAddItemButton) cancelAddItemButton.addEventListener('click', () => renderAddInventoryItemButton(siteId, siteName));
+    }
+
+    async function handleAddInventoryItemSubmit(event, siteId, siteName) {
+        event.preventDefault();
+        if (currentUserRole !== 'oficina') return;
+
+        const form = event.target;
+        const itemName = form.elements['item-name'].value.trim();
+        const quantityStr = form.elements['item-quantity'].value;
+        const unit = form.elements['item-unit'].value.trim();
+        const serialModel = form.elements['item-serial-model'].value.trim();
+        const condition = form.elements['item-condition'].value.trim();
+        const description = form.elements['item-description'].value.trim();
+        
+        const errorElement = document.getElementById('add-item-error');
+        if (errorElement) errorElement.textContent = '';
+
+        if (!itemName || !quantityStr || !unit) {
+            if (errorElement) errorElement.textContent = 'Equipo/Maquinaria, Cantidad y Unidad son obligatorios.'; return;
+        }
+        const quantity = parseFloat(quantityStr);
+        if (isNaN(quantity) || quantity < 0) {
+            if (errorElement) errorElement.textContent = 'La cantidad debe ser un número válido y no negativo.'; return;
+        }
+        const user = auth.currentUser;
+        if (!user) {
+            if (errorElement) errorElement.textContent = 'Error de autenticación. Por favor, inicie sesión de nuevo.'; return;
+        }
+
+        const submitButton = form.querySelector('button[type="submit"]');
+        const originalButtonText = submitButton.textContent;
+        submitButton.disabled = true;
+        submitButton.textContent = 'Guardando Ítem...';
+
+        try {
+            let performingUserName = "Usuario Desconocido";
+            let performingUserApellidos = "";
+            let performingUserCedula = "";
+            const userProfileRef = db.collection("users").doc(user.uid);
+            const userProfileSnap = await userProfileRef.get();
+            if (userProfileSnap.exists) {
+                const userProfileData = userProfileSnap.data();
+                performingUserName = userProfileData.nombre || performingUserName;
+                performingUserApellidos = userProfileData.apellidos || "";
+                performingUserCedula = userProfileData.cedula || "";
+            } else {
+                console.warn(`User profile document not found for UID: ${user.uid}. History log will have limited user details.`);
+            }
+
+            const newItemRef = db.collection("inventoryItems").doc();
+            const timestamp = firebase.firestore.FieldValue.serverTimestamp();
+            const newItemData = {
+                siteId: siteId,
+                itemName: itemName,
+                quantity: quantity,
+                initialQuantity: quantity,
+                unit: unit,
+                serialModel: serialModel,
+                condition: condition,
+                description: description,
+                createdBy: user.uid,
+                createdAt: timestamp,
+                lastUpdatedAt: timestamp,
+                status: "Disponible" 
+            };
+            await newItemRef.set(newItemData);
+            await newItemRef.collection("history").add({
+                timestamp: timestamp,
+                userId: user.uid,
+                userName: performingUserName,
+                userApellidos: performingUserApellidos,
+                userCedula: performingUserCedula,
+                action: "CREADO",
+                details: { 
+                    createdWithQuantity: quantity, 
+                    unit: unit,
+                    serialModel: serialModel,
+                    condition: condition,
+                    notes: `Ítem "${itemName}" creado en el sistema en obra "${siteName}".`
+                }
+            });
+            console.log("Inventory item and history log created successfully!", newItemRef.id);
+            renderAddInventoryItemButton(siteId, siteName);
+            loadInventoryItems(siteId, siteName);
+        } catch (error) {
+            console.error("Error adding inventory item: ", error);
+            if (errorElement) errorElement.textContent = `Error al guardar el ítem: ${error.message}`;
+            submitButton.disabled = false;
+            submitButton.textContent = originalButtonText;
+        }
+    }
+
+    // --- Item History Modal Functions ---
+    if (closeHistoryModalButton && historyModal) {
+        closeHistoryModalButton.addEventListener('click', () => {
+            historyModal.classList.add('hidden');
+        });
+        // Optional: Close modal if clicked outside of the content
+        historyModal.addEventListener('click', (event) => {
+            if (event.target === historyModal) {
+                historyModal.classList.add('hidden');
+            }
+        });
+    }
+
+    async function showItemHistory(itemId, itemName) {
+        if (!historyModal || !historyModalTitle || !historyModalContent) {
+            console.error("History modal elements not found");
+            return;
+        }
+        const escapedItemName = itemName ? itemName.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : 'Ítem Desconocido';
+        historyModalTitle.textContent = `Historial para: ${escapedItemName}`;
+        historyModalContent.innerHTML = '<p class="text-nova-gray p-4">Cargando historial...</p>';
+        historyModal.classList.remove('hidden');
+
+        try {
+            const historySnapshot = await db.collection("inventoryItems").doc(itemId)
+                                            .collection("history")
+                                            .orderBy("timestamp", "desc")
+                                            .get();
+            if (historySnapshot.empty) {
+                historyModalContent.innerHTML = '<p class="text-nova-gray p-4">No hay historial registrado para este ítem.</p>';
+                return;
+            }
+            let historyHTML = '<ul class="space-y-3 text-left">';
+            historySnapshot.forEach(doc => {
+                const log = doc.data();
+                const logDate = log.timestamp ? new Date(log.timestamp.seconds * 1000).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' }) : 'Fecha desconocida';
+                
+                let detailsHTML = '';
+                if (log.details && typeof log.details === 'object' && Object.keys(log.details).length > 0) {
+                    detailsHTML += '<ul class="list-disc list-inside pl-4 text-xs mt-1 text-gray-600 space-y-1">';
+                    for (const key in log.details) {
+                        // Simple pretty print for keys
+                        const prettyKey = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+                        detailsHTML += `<li><span class="font-medium">${prettyKey}:</span> ${log.details[key]}</li>`;
+                    }
+                    detailsHTML += '</ul>';
+                }
+
+                historyHTML += `
+                    <li class="p-3 bg-nova-gray-light rounded-md shadow-sm border border-gray-200">
+                        <p class="font-semibold text-nova-green-dark">${log.action || 'Acción Desconocida'}</p>
+                        <p class="text-xs text-gray-500">Fecha: ${logDate}</p>
+                        <p class="text-xs text-gray-500">Usuario: ${log.userName || 'N/A'} ${log.userApellidos || ''} (Cédula: ${log.userCedula || 'N/A'})</p>
+                        ${detailsHTML}
+                    </li>
+                `;
+            });
+            historyHTML += '</ul>';
+            historyModalContent.innerHTML = historyHTML;
+        } catch (error) {
+            console.error(`Error loading history for item ${itemId}:`, error);
+            historyModalContent.innerHTML = `<p class="text-red-500 p-4">Error al cargar el historial: ${error.message}</p>`;
         }
     }
 

@@ -16,7 +16,7 @@
         theme: {
           extend: {
             colors: {
-              'nova-green': { // Updated darker green scheme
+              'nova-green': { 
                 light: '#059669', 
                 DEFAULT: '#047857', 
                 dark: '#064E3B',  
@@ -67,7 +67,7 @@
                         <p class="text-nova-gray">Cargando obras...</p>
                     </div>
                     <div id="add-site-form-container">
-                        </div>
+                    </div>
                 </div>
 
                 <div id="inventory-section" class="hidden bg-white p-6 rounded-lg shadow-lg">
@@ -78,8 +78,8 @@
                         </button>
                     </div>
                     <div id="add-item-form-container" class="mb-6">
-                        </div>
-                    <div id="inventory-list">
+                    </div>
+                    <div id="inventory-list" class="mb-4">
                         <p class="text-nova-gray">Cargando inventario...</p>
                     </div>
                 </div>
@@ -89,6 +89,23 @@
         <footer class="text-center text-nova-gray mt-12 py-4">
             <p>&copy; <span id="current-year"></span> Nova Urbano. Todos los derechos reservados.</p>
         </footer>
+    </div>
+
+    <div id="history-modal" class="fixed inset-0 bg-gray-800 bg-opacity-75 overflow-y-auto h-full w-full flex items-center justify-center hidden z-50 p-4">
+        <div class="relative mx-auto p-5 sm:p-6 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <h3 class="text-xl leading-6 font-bold text-nova-green-dark text-center mb-4" id="history-modal-title">Historial del Ítem</h3>
+                <div class="mt-2 px-2 sm:px-4 py-3 max-h-[60vh] sm:max-h-[70vh] overflow-y-auto" id="history-modal-content">
+                    <p class="text-nova-gray">Cargando historial...</p>
+                </div>
+                <div class="mt-4 px-2 sm:px-4 py-3 text-right">
+                    <button id="close-history-modal-button"
+                            class="px-4 py-2 bg-nova-green hover:bg-nova-green-dark text-white text-base font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nova-green transition-colors duration-150">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
