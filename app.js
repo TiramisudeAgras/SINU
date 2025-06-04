@@ -58,6 +58,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const editItemSiteIdInput = document.getElementById('edit-item-site-id');
     const editItemSiteNameInput = document.getElementById('edit-item-site-name');
 
+    // app.js - Add these to your DOM Element References section
+    const adjustQuantityModal = document.getElementById('adjust-quantity-modal');
+    const adjustQuantityForm = document.getElementById('adjust-quantity-form');
+    const adjustQuantityModalTitle = document.getElementById('adjust-quantity-modal-title'); // Though we might set item name elsewhere
+    const adjustQuantityItemNameDisplay = document.getElementById('adjust-quantity-item-name');
+    const cancelAdjustQuantityButton = document.getElementById('cancel-adjust-quantity-button');
+    const adjustItemIdInput = document.getElementById('adjust-item-id');
+    const adjustItemSiteIdInput = document.getElementById('adjust-item-site-id');
+    const adjustItemSiteNameInput = document.getElementById('adjust-item-site-name');
+    const adjustItemCurrentQuantityInput = document.getElementById('adjust-item-current-quantity'); // Hidden input to store numeric current quantity
+    const currentItemQuantityDisplay = document.getElementById('current-item-quantity-display'); // Readonly display field
+
 
     // --- Initial Page Setup ---
     if (currentYearSpan) {
@@ -595,6 +607,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <div class="flex space-x-2 mt-2 sm:mt-0 flex-shrink-0 flex-wrap gap-2 items-start">
                                 ${currentUserRole === 'oficina' ? `
                                     <button class="edit-item-btn text-xs bg-blue-500 hover:bg-blue-600 text-white py-1 px-2 rounded" data-item-id="${itemId}" data-site-id="${siteId}" data-site-name="${siteName}">Editar</button>
+                                    <button class="adjust-quantity-btn text-xs bg-green-500 hover:bg-green-600 text-white py-1 px-2 rounded" data-item-id="${itemId}" data-site-id="${siteId}" data-site-name="${siteName}" data-item-name="${escapedItemName}" data-current-quantity="${item.quantity}">Ajustar Cant.</button> 
                                     <button class="transfer-item-btn text-xs bg-yellow-500 hover:bg-yellow-600 text-black py-1 px-2 rounded" data-item-id="${itemId}" data-site-id="${siteId}" data-site-name="${siteName}">Transferir</button>
                                 ` : ''}
                                 <button class="view-history-btn text-xs bg-gray-400 hover:bg-gray-500 text-white py-1 px-2 rounded" data-item-id="${itemId}" data-item-name="${escapedItemName}">Historial</button>
@@ -614,6 +627,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         const itemId = e.target.dataset.itemId;
                         const siteId = e.target.dataset.siteId;
                         const siteName = e.target.dataset.siteName;
+                        const itemName = e.target.dataset.itemName;
+                        const currentQuantity = parseFloat(e.target.dataset.currentQuantity);
+                        renderAdjustQuantityForm(itemId, itemName, currentQuantity, siteId, siteName);
                         console.log("Edit item clicked:", itemId);
                         
                         try {
@@ -644,6 +660,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     showItemHistory(itemId, itemName);
                 });
             });
+            document.querySelectorAll('.adjust-quantity-btn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const itemId = e.target.dataset.itemId;
+                    const siteId = e.target.dataset.siteId;
+                    const siteName = e.target.dataset.siteName;
+                    const itemName = e.target.dataset.itemName;
+                    const currentQuantity = parseFloat(e.target.dataset.currentQuantity);
+                    renderAdjustQuantityForm(itemId, itemName, currentQuantity, siteId, siteName);
+                });
+            });
         } catch (error) {
             console.error(`Error loading inventory items for site ${siteId}:`, error);
             inventoryListContainer.innerHTML = `<p class="text-red-500 p-4">Error al cargar el inventario: ${error.message}</p>`; // UI Text
@@ -651,6 +677,40 @@ document.addEventListener('DOMContentLoaded', () => {
                 inventoryListContainer.innerHTML += `<p class="text-sm text-red-400 p-4">Es posible que necesite crear un índice compuesto en Firestore. Revise la consola de Firebase para ver el enlace de creación del índice si está disponible en el mensaje de error original.</p>`; // UI Text
             }
         }
+    }
+
+    // app.js - Add this new function
+    function renderAdjustQuantityForm(itemId, itemName, currentQuantity, siteId, siteName) {
+        if (!adjustQuantityModal || !adjustQuantityForm || currentUserRole !== 'oficina') return;
+
+        console.log(`Rendering adjust quantity form for item: ${itemName} (ID: ${itemId}), current qty: ${currentQuantity}`);
+
+        // Store necessary data in hidden inputs or directly on the form
+        if(adjustItemIdInput) adjustItemIdInput.value = itemId;
+        if(adjustItemSiteIdInput) adjustItemSiteIdInput.value = siteId;
+        if(adjustItemSiteNameInput) adjustItemSiteNameInput.value = siteName;
+        const adjustItemNameInput = document.createElement('input'); // Create a hidden input for item name
+        adjustItemNameInput.type = 'hidden';
+        adjustItemNameInput.id = 'adjust-item-name-hidden'; 
+        if(adjustItemNameInput) adjustItemNameInput.value = itemName;
+        adjustQuantityForm.appendChild(adjustItemNameInput); // Append to form to be accessible
+        if(adjustItemCurrentQuantityInput) adjustItemCurrentQuantityInput.value = currentQuantity; // Store numeric current quantity
+
+        // Display item name and current quantity
+        if(adjustQuantityItemNameDisplay) adjustQuantityItemNameDisplay.textContent = `Ítem: ${itemName}`;
+        if(currentItemQuantityDisplay) currentItemQuantityDisplay.value = currentQuantity; // Display in readonly field
+
+        // Clear previous new quantity and reason, and any errors
+        const newItemQuantityEl = adjustQuantityForm.elements['newItemQuantity'];
+        const adjustmentReasonEl = adjustQuantityForm.elements['adjustmentReason'];
+        const errorElement = document.getElementById('adjust-quantity-error');
+
+        if(newItemQuantityEl) newItemQuantityEl.value = ''; // Clear previous input
+        if(adjustmentReasonEl) adjustmentReasonEl.value = ''; // Clear previous input
+        if(errorElement) errorElement.textContent = '';
+
+        adjustQuantityModal.classList.remove('hidden');
+        if(newItemQuantityEl) newItemQuantityEl.focus(); // Focus on the new quantity field
     }
 
     function renderAddInventoryItemButton(siteId, siteName) {
@@ -853,6 +913,126 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     // --- END: Edit Item Modal Event Listeners ---
 
+    // --- Adjust Quantity Modal Functions ---
+    if (adjustQuantityForm) {
+        adjustQuantityForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const itemId = adjustItemIdInput.value;
+            const siteId = adjustItemSiteIdInput.value;
+            const siteName = adjustItemSiteNameInput.value;
+            const currentQuantity = parseFloat(adjustItemCurrentQuantityInput.value);
+            const itemName = document.getElementById('adjust-item-name-hidden').value; // Get item name
+            await handleAdjustQuantitySubmit(event, itemId, currentQuantity, siteId, siteName, itemName); // Pass itemName
+        });
+    }
+
+    if (cancelAdjustQuantityButton && adjustQuantityModal) {
+        cancelAdjustQuantityButton.addEventListener('click', () => {
+            adjustQuantityModal.classList.add('hidden');
+        });
+        adjustQuantityModal.addEventListener('click', (event) => {
+            if (event.target === adjustQuantityModal) {
+                adjustQuantityModal.classList.add('hidden');
+            }
+        });
+    }
+
+    // app.js - Add this new function
+async function handleAdjustQuantitySubmit(event, itemId, oldQuantity, siteId, siteName, itemName) {
+    if (currentUserRole !== 'oficina') {
+        console.warn("Attempt to adjust quantity by non-oficina role blocked.");
+        return;
+    }
+
+    const form = event.target;
+    const newQuantityStr = form.elements['newItemQuantity'].value;
+    const reason = form.elements['adjustmentReason'].value.trim();
+
+    const errorElement = document.getElementById('adjust-quantity-error');
+    if (errorElement) errorElement.textContent = '';
+
+    if (!newQuantityStr) {
+        if (errorElement) errorElement.textContent = 'La nueva cantidad es obligatoria.'; // UI Text
+        return;
+    }
+    if (!reason) {
+        if (errorElement) errorElement.textContent = 'El motivo del ajuste es obligatorio.'; // UI Text
+        return;
+    }
+
+    const newQuantity = parseFloat(newQuantityStr);
+    if (isNaN(newQuantity) || newQuantity < 0) {
+        if (errorElement) errorElement.textContent = 'La nueva cantidad debe ser un número válido y no negativo.'; // UI Text
+        return;
+    }
+
+    if (newQuantity === oldQuantity) {
+         if (errorElement) errorElement.textContent = 'La nueva cantidad es igual a la cantidad actual. No se realizaron cambios.'; // UI Text
+        return;
+    }
+
+    const user = auth.currentUser;
+    if (!user) {
+        if (errorElement) errorElement.textContent = 'Error de autenticación.'; // UI Text
+        return;
+    }
+
+    const submitButton = form.querySelector('button[type="submit"]');
+    const originalButtonText = submitButton.textContent;
+    submitButton.disabled = true;
+    submitButton.textContent = 'Ajustando...'; // UI Text
+
+    try {
+        let performingUserName = "Usuario Desconocido";
+        let performingUserApellidos = "";
+        let performingUserCedula = "";
+        const userProfileRef = db.collection("users").doc(user.uid);
+        const userProfileSnap = await userProfileRef.get();
+        if (userProfileSnap.exists) {
+            const userProfileData = userProfileSnap.data();
+            performingUserName = userProfileData.nombre || performingUserName;
+            performingUserApellidos = userProfileData.apellidos || "";
+            performingUserCedula = userProfileData.cedula || "";
+        }
+
+        const itemRef = db.collection("inventoryItems").doc(itemId);
+        const timestamp = firebase.firestore.FieldValue.serverTimestamp();
+
+        // 1. Update the item's quantity
+        await itemRef.update({
+            quantity: newQuantity,
+            lastUpdatedAt: timestamp
+        });
+
+        // 2. Log the adjustment in history
+        await itemRef.collection("history").add({
+            timestamp: timestamp,
+            userId: user.uid,
+            userName: performingUserName,
+            userApellidos: performingUserApellidos,
+            userCedula: performingUserCedula,
+            action: "CANTIDAD_AJUSTADA", // UI Text
+            details: {
+                oldQuantity: oldQuantity,
+                newQuantity: newQuantity,
+                adjustment: newQuantity - oldQuantity,
+                reason: reason,
+                notes: `Cantidad ajustada para "${itemName || 'ítem desconocido'}" en obra "${siteName}".`
+            }
+        });
+
+        console.log("Inventory item quantity adjusted successfully:", itemId);
+        if (adjustQuantityModal) adjustQuantityModal.classList.add('hidden');
+        loadInventoryItems(siteId, siteName); // Refresh the list
+
+    } catch (error) {
+        console.error("Error adjusting item quantity:", error);
+        if (errorElement) errorElement.textContent = `Error al ajustar cantidad: ${error.message}`; // UI Text
+        submitButton.disabled = false;
+        submitButton.textContent = originalButtonText;
+    }
+}
+
     // --- Edit Item Modal Functions ---
     function renderEditItemForm(itemId, itemData, siteId, siteName) { /* ... Use previous full version ... */ 
         if (!editItemModal || !editItemForm || currentUserRole !== 'oficina') return;
@@ -963,6 +1143,20 @@ document.addEventListener('DOMContentLoaded', () => {
                         detailsHTML += `<li><span class="italic">${prettyField}:</span> ${oldValueDisplay} &rarr; ${newValueDisplay}</li>`;
                     });
                     detailsHTML += '</ul></li>';
+                }
+                if (log.details.notes) {
+                    detailsHTML += `<li><span class="font-medium text-gray-700">Notas:</span> ${log.details.notes}</li>`;
+                }
+                break;
+            case "CANTIDAD_AJUSTADA":
+                detailsHTML += `<li><span class="font-medium text-gray-700">Cantidad Anterior:</span> ${log.details.oldQuantity !== undefined ? log.details.oldQuantity : 'N/A'}</li>`;
+                detailsHTML += `<li><span class="font-medium text-gray-700">Nueva Cantidad:</span> ${log.details.newQuantity !== undefined ? log.details.newQuantity : 'N/A'}</li>`;
+                if (log.details.adjustment !== undefined) {
+                    const signo = log.details.adjustment > 0 ? '+' : '';
+                    detailsHTML += `<li><span class="font-medium text-gray-700">Ajuste:</span> ${signo}${log.details.adjustment}</li>`;
+                }
+                if (log.details.reason) {
+                    detailsHTML += `<li><span class="font-medium text-gray-700">Motivo:</span> ${log.details.reason}</li>`;
                 }
                 if (log.details.notes) {
                     detailsHTML += `<li><span class="font-medium text-gray-700">Notas:</span> ${log.details.notes}</li>`;
