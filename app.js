@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // -- END: Firebase Configuration --
 
     let currentUserRole = null;
+    let showZeroQuantityItems = false; // For the toggle state
 
     // --- DOM Element References ---
     const authSection = document.getElementById('auth-section');
@@ -84,6 +85,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const transferSourceItemDataJsonInput = document.getElementById('transfer-source-item-data-json');
     const transferCurrentQuantityDisplay = document.getElementById('transfer-current-quantity-display');
     const destinationSiteIdSelect = document.getElementById('destination-site-id');
+
+    // app.js - DOM Element References
+    const toggleZeroQtyCheckbox = document.getElementById('toggle-zero-qty');
 
 
     // --- Initial Page Setup ---
@@ -579,101 +583,124 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    async function loadInventoryItems(siteId, siteName) {
-        if (!inventoryListContainer) { /* ... */ return; }
-        inventoryListContainer.innerHTML = `<p class="text-nova-gray p-4">Cargando inventario para ${siteName}...</p>`;
-        const user = auth.currentUser;
-        if (!user) { /* ... */ return; }
+    // From your app.js
+async function loadInventoryItems(siteId, siteName) {
+    // Store current site for the toggle to use (if using global vars)
+    // currentOpenSiteId = siteId; 
+    // currentOpenSiteName = siteName;
 
-        try {
-            const inventorySnapshot = await db.collection("inventoryItems")
-                .where("siteId", "==", siteId)
-                .orderBy("itemName", "asc")
-                .get();
-            if (inventorySnapshot.empty) {
-                inventoryListContainer.innerHTML = `<p class="text-nova-gray p-4">No hay ítems de inventario para esta obra (${siteName}).</p>`;
-                return;
+    if (!inventoryListContainer) { 
+        console.error("Inventory list container not found");
+        return; 
+    }
+    inventoryListContainer.innerHTML = `<p class="text-nova-gray p-4">Cargando inventario para ${siteName}...</p>`; //
+    const user = auth.currentUser; //
+    if (!user) { //
+        inventoryListContainer.innerHTML = '<p class="text-red-500 p-4">Error: Usuario no autenticado.</p>'; //
+        return; //
+    }
+
+    try {
+        const inventorySnapshot = await db.collection("inventoryItems") //
+                                          .where("siteId", "==", siteId) //
+                                          .orderBy("itemName", "asc") //
+                                          .get(); //
+        
+        let itemsToDisplay = 0; // Counter for visible items //
+        let itemsHTML = '<ul class="space-y-3">'; //
+
+        inventorySnapshot.forEach(doc => { //
+            const item = doc.data(); //
+            const itemId = doc.id; //
+
+            // ** NEW: Filter for zero quantity **
+            if (item.quantity === 0 && !showZeroQuantityItems) { //
+                return; // Skip rendering this item //
             }
-            let itemsHTML = '<ul class="space-y-3">';
-            inventorySnapshot.forEach(doc => {
-                const item = doc.data();
-                const itemId = doc.id;
-                const escapedItemName = item.itemName ? item.itemName.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char])) : 'Ítem sin nombre';
-                const escapedUnit = item.unit ? item.unit.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char])) : '';
-                const escapedSerialModel = item.serialModel ? item.serialModel.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char])) : 'N/A';
-                const escapedCondition = item.condition ? item.condition.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char])) : 'N/A';
-                const escapedDescription = item.description ? item.description.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char])) : '';
-                const nuiDisplay = item.nui ? item.nui.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char])) : 'N/A'; // ** DISPLAY NUI **
+            itemsToDisplay++; // Increment if item is to be displayed //
 
-                itemsHTML += `
-                    <li class="bg-white p-4 rounded-lg shadow border border-nova-gray-light transition-shadow hover:shadow-md" data-item-id="${itemId}">
-                        <div class="flex justify-between items-start flex-wrap">
-                            <div class="flex-grow pr-4 mb-2 sm:mb-0">
-                                <h5 class="text-lg font-semibold text-nova-green-dark">${escapedItemName}</h5>
-                                <p class="text-xs text-nova-gray-dark font-medium">NUI: ${nuiDisplay}</p> <p class="text-sm text-nova-gray-dark">Cantidad: <span class="font-medium text-black">${item.quantity !== undefined ? item.quantity : 'N/A'}</span> ${escapedUnit}</p>
-                                <p class="text-sm text-nova-gray-dark">Serial/Modelo: <span class="font-medium text-black">${escapedSerialModel}</span></p>
-                                <p class="text-sm text-nova-gray-dark">Estado: <span class="font-medium text-black">${escapedCondition}</span></p>
-                                ${escapedDescription ? `<p class="mt-1 text-xs text-gray-500 w-full">Obs: ${escapedDescription}</p>` : ''}
-                            </div>
-                            <div class="flex space-x-2 mt-2 sm:mt-0 flex-shrink-0 flex-wrap gap-2 items-start">
-                                ${currentUserRole === 'oficina' ? `
-                                    <button class="edit-item-btn text-xs bg-blue-500 hover:bg-blue-600 text-white py-1 px-2 rounded" data-item-id="${itemId}" data-site-id="${siteId}" data-site-name="${siteName}">Editar</button>
-                                    <button class="adjust-quantity-btn text-xs bg-green-500 hover:bg-green-600 text-white py-1 px-2 rounded" data-item-id="${itemId}" data-site-id="${siteId}" data-site-name="${siteName}" data-item-name="${escapedItemName}" data-current-quantity="${item.quantity}">Ajustar Cant.</button>
-                                    <button class="transfer-item-btn text-xs bg-yellow-500 hover:bg-yellow-600 text-black py-1 px-2 rounded" data-item-id="${itemId}" data-site-id="${siteId}" data-site-name="${siteName}">Transferir</button>
-                                ` : ''}
-                                <button class="view-history-btn text-xs bg-gray-400 hover:bg-gray-500 text-white py-1 px-2 rounded" data-item-id="${itemId}" data-item-name="${escapedItemName}">Historial</button>
-                            </div>
+            const escapedItemName = item.itemName ? item.itemName.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : 'Ítem sin nombre'; //
+            const nuiDisplay = item.nui ? item.nui.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : 'N/A'; //
+            const escapedUnit = item.unit ? item.unit.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : ''; //
+            const escapedSerialModel = item.serialModel ? item.serialModel.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : 'N/A'; //
+            const escapedCondition = item.condition ? item.condition.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : 'N/A'; //
+            const escapedDescription = item.description ? item.description.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : ''; //
+            
+            const zeroQtyClass = item.quantity === 0 ? 'opacity-60' : ''; //
+
+            itemsHTML += `
+                <li class="bg-white p-4 rounded-lg shadow border border-nova-gray-light transition-shadow hover:shadow-md ${zeroQtyClass}" data-item-id="${itemId}">
+                    <div class="flex justify-between items-start flex-wrap">
+                        <div class="flex-grow pr-4 mb-2 sm:mb-0">
+                            <h5 class="text-lg font-semibold text-nova-green-dark">${escapedItemName}</h5>
+                            <p class="text-xs text-nova-gray-dark font-medium">NUI: ${nuiDisplay}</p>
+                            <p class="text-sm text-nova-gray-dark">Cantidad: <span class="font-medium text-black">${item.quantity !== undefined ? item.quantity : 'N/A'}</span> ${escapedUnit}</p>
+                            <p class="text-sm text-nova-gray-dark">Serial/Modelo: <span class="font-medium text-black">${escapedSerialModel}</span></p>
+                            <p class="text-sm text-nova-gray-dark">Estado: <span class="font-medium text-black">${escapedCondition}</span></p>
+                            ${escapedDescription ? `<p class="mt-1 text-xs text-gray-500 w-full">Obs: ${escapedDescription}</p>` : ''}
                         </div>
-                        <p class="text-xs text-gray-400 mt-2 w-full text-right">Añadido: ${item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleDateString() : 'N/A'}</p>
-                    </li>
-                `;
-            });
-            itemsHTML += '</ul>';
-            inventoryListContainer.innerHTML = itemsHTML;
+                        <div class="flex space-x-2 mt-2 sm:mt-0 flex-shrink-0 flex-wrap gap-2 items-start">
+                            ${currentUserRole === 'oficina' ? `
+                                <button class="edit-item-btn text-xs bg-blue-500 hover:bg-blue-600 text-white py-1 px-2 rounded" data-item-id="${itemId}" data-site-id="${siteId}" data-site-name="${siteName}">Editar</button>
+                                <button class="adjust-quantity-btn text-xs bg-green-500 hover:bg-green-600 text-white py-1 px-2 rounded" data-item-id="${itemId}" data-site-id="${siteId}" data-site-name="${siteName}" data-item-name="${escapedItemName}" data-current-quantity="${item.quantity}">Ajustar Cant.</button>
+                                <button class="transfer-item-btn text-xs bg-yellow-500 hover:bg-yellow-600 text-black py-1 px-2 rounded" data-item-id="${itemId}" data-site-id="${siteId}" data-site-name="${siteName}">Transferir</button>
+                            ` : ''}
+                            <button class="view-history-btn text-xs bg-gray-400 hover:bg-gray-500 text-white py-1 px-2 rounded" data-item-id="${itemId}" data-item-name="${escapedItemName}">Historial</button>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-2 w-full text-right">Añadido: ${item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleDateString() : 'N/A'}</p>
+                </li>
+            `; //
+        });
+        itemsHTML += '</ul>'; //
 
-            // Re-attach event listeners (no change to listeners themselves for this step)
-            if (currentUserRole === 'oficina') {
-                document.querySelectorAll('.edit-item-btn').forEach(button => {
-                    button.addEventListener('click', async (e) => {
-                        const itemId = e.target.dataset.itemId; const siteId = e.target.dataset.siteId; const siteName = e.target.dataset.siteName;
-                        try {
-                            const itemDoc = await db.collection("inventoryItems").doc(itemId).get();
-                            if (itemDoc.exists) renderEditItemForm(itemId, itemDoc.data(), siteId, siteName); else alert("Error: Ítem no encontrado.");
-                        } catch (error) { console.error("Error fetching item for edit:", error); alert("Error al cargar datos del ítem para editar."); }
-                    });
-                });
-                document.querySelectorAll('.adjust-quantity-btn').forEach(button => {
-                    button.addEventListener('click', (e) => {
-                        const itemId = e.target.dataset.itemId; const siteId = e.target.dataset.siteId; const siteName = e.target.dataset.siteName;
-                        const itemName = e.target.dataset.itemName; const currentQuantity = parseFloat(e.target.dataset.currentQuantity);
-                        renderAdjustQuantityForm(itemId, itemName, currentQuantity, siteId, siteName);
-                    });
-                });
-                document.querySelectorAll('.transfer-item-btn').forEach(button => {
-                    button.addEventListener('click', async (e) => {
-                        const itemId = e.target.dataset.itemId; const siteId = e.target.dataset.siteId; const siteName = e.target.dataset.siteName;
-                        try {
-                            const itemDoc = await db.collection("inventoryItems").doc(itemId).get();
-                            if (itemDoc.exists) renderTransferItemForm(itemId, itemDoc.data(), siteId, siteName); else alert("Error: Ítem no encontrado.");
-                        } catch (error) { console.error("Error fetching item for transfer:", error); alert("Error al cargar datos del ítem para transferir."); }
-                    });
-                });
+        if (inventorySnapshot.empty || itemsToDisplay === 0) { // Check if snapshot was empty OR if all items were filtered out //
+            let noItemsMessage = `<p class="text-nova-gray p-4">No hay ítems de inventario para esta obra (${siteName}).</p>`; //
+            if (!inventorySnapshot.empty && itemsToDisplay === 0) { // Means there are items, but all are zero quantity and hidden //
+                noItemsMessage = `<p class="text-nova-gray p-4">Todos los ítems para esta obra tienen cantidad cero. Active "Mostrar ítems sin stock" para verlos.</p>`; //
             }
-            document.querySelectorAll('.view-history-btn').forEach(button => {
-                button.addEventListener('click', (e) => {
-                    const itemId = e.target.dataset.itemId; const itemName = e.target.dataset.itemName;
-                    showItemHistory(itemId, itemName);
+            inventoryListContainer.innerHTML = noItemsMessage; //
+        } else {
+            inventoryListContainer.innerHTML = itemsHTML; //
+        }
+
+        // Re-attach event listeners
+        if (currentUserRole === 'oficina') { //
+            document.querySelectorAll('.edit-item-btn').forEach(button => {  //
+                button.addEventListener('click', async (e) => { //
+                    const itemId = e.target.dataset.itemId; const siteId = e.target.dataset.siteId; const siteName = e.target.dataset.siteName; //
+                    try { const itemDoc = await db.collection("inventoryItems").doc(itemId).get(); if (itemDoc.exists) renderEditItemForm(itemId, itemDoc.data(), siteId, siteName); else alert("Error: Ítem no encontrado.");} catch (error) { console.error("Error fetching item for edit:", error); alert("Error al cargar datos del ítem para editar."); } //
                 });
             });
-        } catch (error) {
-            // ... existing error handling ...
-            console.error(`Error loading inventory items for site ${siteId}:`, error);
-            inventoryListContainer.innerHTML = `<p class="text-red-500 p-4">Error al cargar el inventario: ${error.message}</p>`;
-            if (error.message.includes("index")) {
-                inventoryListContainer.innerHTML += `<p class="text-sm text-red-400 p-4">Es posible que necesite crear un índice compuesto en Firestore. Revise la consola de Firebase para ver el enlace de creación del índice si está disponible en el mensaje de error original.</p>`;
-            }
+             document.querySelectorAll('.adjust-quantity-btn').forEach(button => {  //
+                button.addEventListener('click', (e) => { //
+                    const itemId = e.target.dataset.itemId; const siteId = e.target.dataset.siteId; const siteName = e.target.dataset.siteName; //
+                    const itemName = e.target.dataset.itemName; const currentQuantity = parseFloat(e.target.dataset.currentQuantity); //
+                    renderAdjustQuantityForm(itemId, itemName, currentQuantity, siteId, siteName); //
+                });
+            });
+            document.querySelectorAll('.transfer-item-btn').forEach(button => {  //
+                 button.addEventListener('click', async (e) => { //
+                    const itemId = e.target.dataset.itemId; const siteId = e.target.dataset.siteId; const siteName = e.target.dataset.siteName; //
+                    try { const itemDoc = await db.collection("inventoryItems").doc(itemId).get(); if (itemDoc.exists) renderTransferItemForm(itemId, itemDoc.data(), siteId, siteName); else alert("Error: Ítem no encontrado.");} catch (error) { console.error("Error fetching item for transfer:", error); alert("Error al cargar datos del ítem para transferir."); } //
+                });
+            });
+        }
+        document.querySelectorAll('.view-history-btn').forEach(button => {  //
+            button.addEventListener('click', (e) => { //
+                const itemId = e.target.dataset.itemId; const itemName = e.target.dataset.itemName; //
+                showItemHistory(itemId, itemName); //
+            });
+        });
+
+    } catch (error) {
+        console.error(`Error loading inventory items for site ${siteId}:`, error); //
+        inventoryListContainer.innerHTML = `<p class="text-red-500 p-4">Error al cargar el inventario: ${error.message}.</p>`; //
+        if (error.message.includes("index")) { //
+            inventoryListContainer.innerHTML += `<p class="text-sm text-red-400 p-4">Es posible que necesite crear un índice compuesto en Firestore.</p>`; //
         }
     }
+}
     // app.js - Add this new function
 async function renderTransferItemForm(itemId, itemData, sourceSiteId, sourceSiteName) {
     if (!transferItemModal || !transferItemForm || currentUserRole !== 'oficina') {
@@ -1029,7 +1056,7 @@ async function renderTransferItemForm(itemId, itemData, sourceSiteId, sourceSite
     }
 
 
-// app.js - Replace the existing (placeholder or previous) handleTransferItemSubmit
+    // app.js - Replace the existing (placeholder or previous) handleTransferItemSubmit
 
 async function handleTransferItemSubmit(event, itemId, sourceItemData, sourceSiteId, sourceSiteName) {
     event.preventDefault();
@@ -1525,6 +1552,24 @@ async function handleAdjustQuantitySubmit(event, itemId, oldQuantity, siteId, si
             historyModalContent.innerHTML = historyHTML;
 
         } catch (error) { /* ... */ }
+    }
+
+    // --- Toggle Zero Quantity Checkbox Listener ---
+    if (toggleZeroQtyCheckbox) {
+        toggleZeroQtyCheckbox.addEventListener('change', () => {
+            showZeroQuantityItems = toggleZeroQtyCheckbox.checked;
+            console.log("Show zero quantity items:", showZeroQuantityItems);
+            const currentViewingSiteId = document.getElementById('adjust-item-site-id')?.value ||
+                                         document.getElementById('edit-item-site-id')?.value ||
+                                         document.getElementById('transfer-source-site-id')?.value;
+            const currentViewingSiteName = selectedSiteNameSpan.textContent;
+
+            if (currentViewingSiteId && currentViewingSiteName && !inventorySection.classList.contains('hidden')) {
+                loadInventoryItems(currentViewingSiteId, currentViewingSiteName);
+            } else if (!inventorySection.classList.contains('hidden')) {
+                console.warn("Could not reload inventory for zero quantity toggle - current site context missing.");
+            }
+        });
     }
 
 }); // End DOMContentLoaded
