@@ -895,8 +895,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const itemRef = db.collection("inventoryItems").doc(itemId);
             await itemRef.update(updated);
             await itemRef.collection("history").add({
-                timestamp: firebase.firestore.FieldValue.serverTimestamp(), userId:user.uid, userName:pUserName, userApellidos:pUserApellidos, userCedula:pUserCedula,
-                action: "ITEM_ACTUALIZADO", details: { changedFields: Object.keys(changes), oldValues: oldVals, newValues: newVals, notes: `Ítem "${updated.itemName}" actualizado.`}
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                userId: user.uid,
+                userName: pUserName,
+                userApellidos: pUserApellidos,
+                userCedula: pUserCedula,
+                action: "Item Modificado", // <-- changed here
+                details: { changedFields: Object.keys(changes), oldValues: oldVals, newValues: newVals, notes: `Ítem "${updated.itemName}" actualizado.`}
             });
             console.log("Item updated:", itemId); 
             btn.disabled = false; btn.textContent = btnTxt; // <-- FIX: re-enable button after success
