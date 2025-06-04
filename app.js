@@ -790,15 +790,68 @@ const firebaseConfig = {
 
     // --- Item History Modal Functions ---
     if (closeHistoryModalButton && historyModal) {
-        closeHistoryModalButton.addEventListener('click', () => {
+    closeHistoryModalButton.addEventListener('click', () => {
+        historyModal.classList.add('hidden');
+    });
+    // Optional: Close modal if clicked outside of the content
+    historyModal.addEventListener('click', (event) => {
+        if (event.target === historyModal) { // Check if the click is on the backdrop itself
             historyModal.classList.add('hidden');
-        });
-        // Optional: Close modal if clicked outside of the content
-        historyModal.addEventListener('click', (event) => {
-            if (event.target === historyModal) {
-                historyModal.classList.add('hidden');
-            }
-        });
+        }
+    });
+    }
+
+    // Helper function to format log details based on action type
+    function formatLogDetails(log) {
+        if (!log.details || typeof log.details !== 'object' || Object.keys(log.details).length === 0) {
+            return '<p class="text-xs text-gray-500 mt-1">No hay detalles adicionales para esta entrada.</p>'; // UI Text
+        }
+
+        let detailsHTML = '<ul class="list-none pl-0 text-xs mt-1 text-gray-600 space-y-1">'; // Changed to list-none for custom styling
+
+        switch (log.action) {
+            case "CREADO":
+                detailsHTML += `<li><span class="font-medium text-gray-700">Cantidad Inicial:</span> ${log.details.createdWithQuantity || 'N/A'} ${log.details.unit || ''}</li>`;
+                if (log.details.serialModel) {
+                    detailsHTML += `<li><span class="font-medium text-gray-700">Serial/Modelo:</span> ${log.details.serialModel}</li>`;
+                }
+                if (log.details.condition) {
+                    detailsHTML += `<li><span class="font-medium text-gray-700">Estado Inicial:</span> ${log.details.condition}</li>`;
+                }
+                if (log.details.notes) {
+                    detailsHTML += `<li><span class="font-medium text-gray-700">Notas:</span> ${log.details.notes}</li>`;
+                }
+                break;
+            // Future cases for other actions:
+            // case "CANTIDAD_AJUSTADA":
+            //     detailsHTML += `<li><span class="font-medium text-gray-700">Cantidad Anterior:</span> ${log.details.oldQuantity || 'N/A'}</li>`;
+            //     detailsHTML += `<li><span class="font-medium text-gray-700">Nueva Cantidad:</span> ${log.details.newQuantity || 'N/A'}</li>`;
+            //     if (log.details.reason) {
+            //         detailsHTML += `<li><span class="font-medium text-gray-700">Razón:</span> ${log.details.reason}</li>`;
+            //     }
+            //     break;
+            // case "TRANSFERENCIA_SALIDA":
+            //     detailsHTML += `<li><span class="font-medium text-gray-700">Cantidad Transferida:</span> ${log.details.quantityTransferred || 'N/A'}</li>`;
+            //     detailsHTML += `<li><span class="font-medium text-gray-700">Hacia Obra ID:</span> ${log.details.toSiteId || 'N/A'} (${log.details.toSiteName || 'Nombre Desconocido'})</li>`;
+            //     break;
+            // case "TRANSFERENCIA_ENTRADA":
+            //     detailsHTML += `<li><span class="font-medium text-gray-700">Cantidad Recibida:</span> ${log.details.quantityReceived || 'N/A'}</li>`;
+            //     detailsHTML += `<li><span class="font-medium text-gray-700">Desde Obra ID:</span> ${log.details.fromSiteId || 'N/A'} (${log.details.fromSiteName || 'Nombre Desconocido'})</li>`;
+            //     break;
+            // case "ITEM_ACTUALIZADO":
+            //     detailsHTML += `<li><span class="font-medium text-gray-700">Campos Modificados:</span> ${(log.details.changedFields || []).join(', ')}</li>`;
+            //     // You might want to show oldValues and newValues if available
+            //     break;
+            default:
+                // Generic fallback for unknown actions or if no specific formatting is defined
+                for (const key in log.details) {
+                    const prettyKey = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+                    detailsHTML += `<li><span class="font-medium text-gray-700">${prettyKey}:</span> ${log.details[key]}</li>`;
+                }
+                break;
+        }
+        detailsHTML += '</ul>';
+        return detailsHTML;
     }
 
     async function showItemHistory(itemId, itemName) {
@@ -806,50 +859,52 @@ const firebaseConfig = {
             console.error("History modal elements not found");
             return;
         }
+
+        // Basic escaping for item name in modal title
         const escapedItemName = itemName ? itemName.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : 'Ítem Desconocido';
         historyModalTitle.textContent = `Historial para: ${escapedItemName}`;
-        historyModalContent.innerHTML = '<p class="text-nova-gray p-4">Cargando historial...</p>';
+        historyModalContent.innerHTML = '<p class="text-nova-gray p-4">Cargando historial...</p>'; // UI Text
         historyModal.classList.remove('hidden');
 
         try {
             const historySnapshot = await db.collection("inventoryItems").doc(itemId)
                                             .collection("history")
-                                            .orderBy("timestamp", "desc")
+                                            .orderBy("timestamp", "desc") // Show newest history first
                                             .get();
+
             if (historySnapshot.empty) {
-                historyModalContent.innerHTML = '<p class="text-nova-gray p-4">No hay historial registrado para este ítem.</p>';
+                historyModalContent.innerHTML = '<p class="text-nova-gray p-4">No hay historial registrado para este ítem.</p>'; // UI Text
                 return;
             }
-            let historyHTML = '<ul class="space-y-3 text-left">';
+
+            let historyHTML = '<ul class="space-y-4 text-left">'; // Increased space-y for better separation
             historySnapshot.forEach(doc => {
                 const log = doc.data();
-                const logDate = log.timestamp ? new Date(log.timestamp.seconds * 1000).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' }) : 'Fecha desconocida';
+                const logDate = log.timestamp ? new Date(log.timestamp.seconds * 1000).toLocaleString('es-CO', { dateStyle: 'long', timeStyle: 'medium' }) : 'Fecha desconocida'; // More detailed date
                 
-                let detailsHTML = '';
-                if (log.details && typeof log.details === 'object' && Object.keys(log.details).length > 0) {
-                    detailsHTML += '<ul class="list-disc list-inside pl-4 text-xs mt-1 text-gray-600 space-y-1">';
-                    for (const key in log.details) {
-                        // Simple pretty print for keys
-                        const prettyKey = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
-                        detailsHTML += `<li><span class="font-medium">${prettyKey}:</span> ${log.details[key]}</li>`;
-                    }
-                    detailsHTML += '</ul>';
-                }
+                const userDetails = `Usuario: ${log.userName || 'N/A'} ${log.userApellidos || ''} (Cédula: ${log.userCedula || 'N/A'})`; // UI Text
+
+                // Use the helper function to format details
+                const formattedDetails = formatLogDetails(log);
 
                 historyHTML += `
-                    <li class="p-3 bg-nova-gray-light rounded-md shadow-sm border border-gray-200">
-                        <p class="font-semibold text-nova-green-dark">${log.action || 'Acción Desconocida'}</p>
-                        <p class="text-xs text-gray-500">Fecha: ${logDate}</p>
-                        <p class="text-xs text-gray-500">Usuario: ${log.userName || 'N/A'} ${log.userApellidos || ''} (Cédula: ${log.userCedula || 'N/A'})</p>
-                        ${detailsHTML}
+                    <li class="p-3 bg-nova-gray-light rounded-lg shadow-sm border border-gray-200">
+                        <div class="flex justify-between items-center mb-1">
+                            <p class="font-semibold text-nova-green-dark text-base">${log.action || 'Acción Desconocida'}</p> <p class="text-xs text-gray-500">${logDate}</p>
+                        </div>
+                        <p class="text-xs text-gray-600 mb-1">${userDetails}</p>
+                        <div class="mt-1 border-t border-gray-300 pt-1">
+                            ${formattedDetails}
+                        </div>
                     </li>
                 `;
             });
             historyHTML += '</ul>';
             historyModalContent.innerHTML = historyHTML;
+
         } catch (error) {
             console.error(`Error loading history for item ${itemId}:`, error);
-            historyModalContent.innerHTML = `<p class="text-red-500 p-4">Error al cargar el historial: ${error.message}</p>`;
+            historyModalContent.innerHTML = `<p class="text-red-500 p-4">Error al cargar el historial: ${error.message}</p>`; // UI Text
         }
     }
 
