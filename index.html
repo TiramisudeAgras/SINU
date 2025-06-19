@@ -61,7 +61,7 @@
                 </div>
 
                 <div id="sites-section" class="bg-white p-6 rounded-lg shadow-lg mb-8">
-                    <h3 class="text-xl font-semibold text-nova-green-dark mb-4">Obras (Construction Sites)</h3>
+                    <h3 class="text-xl font-semibold text-nova-green-dark mb-4">Locaciones</h3>
                     <div id="sites-list" class="mb-4">
                         <p class="text-nova-gray">Cargando obras...</p>
                     </div>
@@ -70,29 +70,55 @@
                 </div>
 
                 <div id="inventory-section" class="hidden bg-white p-6 rounded-lg shadow-lg">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-xl font-semibold text-nova-green-dark">Inventario de: <span id="selected-site-name" class="text-nova-green"></span></h3>
-                        <button id="back-to-sites-button" class="bg-nova-gray hover:bg-nova-gray-dark text-white font-bold py-2 px-3 rounded text-sm transition-colors duration-150">
-                            ← Volver a Obras
-                        </button>
-                    </div>
+    <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-semibold text-nova-green-dark">Inventario de: <span id="selected-site-name" class="text-nova-green"></span></h3>
+        <button id="back-to-sites-button" class="bg-nova-gray hover:bg-nova-gray-dark text-white font-bold py-2 px-3 rounded text-sm transition-colors duration-150">
+            ← Volver a Obras
+        </button>
+    </div>
 
-                    <div class="flex items-center justify-end mb-4">
-                        <label for="toggle-zero-qty" class="flex items-center cursor-pointer">
-                            <span class="mr-3 text-sm font-medium text-nova-gray-dark">Mostrar ítems sin stock</span>
-                            <div class="relative">
-                                <input type="checkbox" id="toggle-zero-qty" class="sr-only peer">
-                                <div class="w-10 h-6 bg-gray-200 rounded-full peer peer-focus:ring-2 peer-focus:ring-nova-green-light dark:peer-focus:ring-nova-green peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-nova-green"></div>
-                            </div>
-                        </label>
-                    </div>
+    <div class="flex items-center justify-end mb-4">
+        <label for="toggle-zero-qty" class="flex items-center cursor-pointer">
+            <span class="mr-3 text-sm font-medium text-nova-gray-dark">Mostrar ítems sin stock</span>
+            <div class="relative">
+                <input type="checkbox" id="toggle-zero-qty" class="sr-only peer">
+                <div class="w-10 h-6 bg-gray-200 rounded-full peer peer-focus:ring-2 peer-focus:ring-nova-green-light dark:peer-focus:ring-nova-green peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-nova-green"></div>
+            </div>
+        </label>
+    </div>
 
-                    <div id="add-item-form-container" class="mb-6">
-                        </div>
-                    <div id="inventory-list" class="mb-4">
-                        <p class="text-nova-gray">Cargando inventario...</p>
-                    </div>
-                </div>
+    <div id="add-item-form-container" class="mb-6">
+    </div>
+    <div id="inventory-list" class="mb-4">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Ítem
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Cantidad
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Unidad
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Serial/Modelo
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Estado
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Acciones
+                    </th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                
+            </tbody>
+        </table>
+    </div>
+</div>
             </section>
         </main>
 
