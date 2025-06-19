@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let currentUserRole = null;
     let showZeroQuantityItems = false;
+    let currentSiteFilter = 'all'; // <-- ADD THIS LINE
 
     // --- DOM Element References ---
     const authSection = document.getElementById('auth-section');
@@ -86,6 +87,24 @@ document.addEventListener('DOMContentLoaded', () => {
         dashboardSection.classList.add('hidden');
     }
 
+     // --- Filter Button Setup ---
+    function setupFilterButtons() {
+        const filterContainer = document.getElementById('site-filter-container');
+        if (!filterContainer) return;
+
+        filterContainer.addEventListener('click', (e) => {
+            if (e.target.matches('.filter-btn')) {
+                // Update active style
+                filterContainer.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active-filter-btn'));
+                e.target.classList.add('active-filter-btn');
+
+                // Update state and reload sites
+                currentSiteFilter = e.target.id.replace('filter-', ''); // "all", "obra", or "bodega"
+                loadConstructionSites();
+            }
+        });
+    }
+
     function showSitesView() {
         sitesSection.classList.remove('hidden');
         inventorySection.classList.add('hidden');
@@ -116,6 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         user.email || 'Usuario';
                     if (dashboardTitle) dashboardTitle.textContent = `Panel de ${userNameDisplay} (${currentUserRole})`;
                     showDashboardSection();
+                    setupFilterButtons();
                     loadConstructionSites();
                 } else {
                     currentUserRole = null;
@@ -441,31 +461,34 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!user) return;
 
         try {
-            const sitesSnapshot = await db.collection("constructionSites")
-                .orderBy("createdAt", "desc")
-                .get();
+            // Start with the base query
+            let query = db.collection("constructionSites");
+
+            // Conditionally add the filter
+            if (currentSiteFilter !== 'all') {
+                query = query.where("type", "==", currentSiteFilter);
+            }
+
+            // Add ordering and get the documents
+            const sitesSnapshot = await query.orderBy("createdAt", "desc").get();
+
             if (sitesSnapshot.empty) {
-                sitesListContainer.innerHTML = '<p class="text-nova-gray p-4">No hay ubicaciones registradas.</p>';
+                let message = 'No hay ubicaciones registradas en el sistema.';
+                if (currentSiteFilter === 'obra') {
+                    message = `No hay obras registradas.`;
+                } else if (currentSiteFilter === 'bodega') {
+                    message = `No hay bodegas registradas.`;
+                }
+                sitesListContainer.innerHTML = `<p class="text-nova-gray p-4">${message}</p>`;
                 return;
             }
+
             let sitesHTML = '<ul class="space-y-3">';
             sitesSnapshot.forEach(doc => {
                 const site = doc.data();
-                const siteType = site.type === 'bodega' ? 'Bodega' : 'Obra'; // Handle type display
-                const escapedSiteName = site.name.replace(/[&<>"']/g, char => ({
-                    '&': '&amp;',
-                    '<': '&lt;',
-                    '>': '&gt;',
-                    '"': '&quot;',
-                    "'": '&#39;'
-                } [char]));
-                const escapedSiteAddress = site.address ? site.address.replace(/[&<>"']/g, char => ({
-                    '&': '&amp;',
-                    '<': '&lt;',
-                    '>': '&gt;',
-                    '"': '&quot;',
-                    "'": '&#39;'
-                } [char])) : '';
+                const siteType = site.type === 'bodega' ? 'Bodega' : 'Obra';
+                const escapedSiteName = site.name.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+                const escapedSiteAddress = site.address ? site.address.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : '';
                 sitesHTML += `
                     <li class="bg-nova-gray-light hover:bg-gray-200 p-4 rounded-lg shadow cursor-pointer transition-colors duration-150 flex justify-between items-center" data-site-id="${doc.id}" data-site-name="${escapedSiteName}">
                         <div>
@@ -478,6 +501,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             sitesHTML += '</ul>';
             sitesListContainer.innerHTML = sitesHTML;
+
+            // Re-attach listeners
             document.querySelectorAll('#sites-list li').forEach(item => {
                 item.addEventListener('click', () => {
                     const siteId = item.dataset.siteId;
@@ -486,7 +511,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             });
         } catch (error) {
-            sitesListContainer.innerHTML = `<p class="text-red-500 p-4">Error al cargar las ubicaciones: ${error.message}.</p>`;
+            let errorMessage = `Error al cargar las ubicaciones: ${error.message}.`;
+            if (error.message.includes("The query requires an index")) {
+                errorMessage += ` <b>Acción Requerida:</b> Debe crear un índice compuesto en Firestore. Busque un enlace en la consola de errores del navegador (F12) para crearlo.`;
+            }
+            sitesListContainer.innerHTML = `<p class="text-red-500 p-4">${errorMessage}</p>`;
         }
     }
 
