@@ -33,7 +33,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentYearSpan = document.getElementById('current-year');
     const dashboardTitle = document.getElementById('dashboard-title');
     const sitesSection = document.getElementById('sites-section');
-    const sitesListContainer = document.getElementById('sites-list');
+    // Main containers for site list and search results
+    const sitesList = document.getElementById('sites-list');
+    const searchResultsContainer = document.getElementById('search-results-container');
     const addSiteFormContainer = document.getElementById('add-site-form-container');
     const inventorySection = document.getElementById('inventory-section');
     const selectedSiteNameSpan = document.getElementById('selected-site-name');
@@ -53,7 +55,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const editItemSiteNameInput = document.getElementById('edit-item-site-name');
     const adjustQuantityModal = document.getElementById('adjust-quantity-modal');
     const adjustQuantityForm = document.getElementById('adjust-quantity-form');
-    const adjustQuantityModalTitle = document.getElementById('adjust-quantity-modal-title');
     const adjustQuantityItemNameDisplay = document.getElementById('adjust-quantity-item-name');
     const cancelAdjustQuantityButton = document.getElementById('cancel-adjust-quantity-button');
     const adjustItemIdInput = document.getElementById('adjust-item-id');
@@ -63,18 +64,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentItemQuantityDisplay = document.getElementById('current-item-quantity-display');
     const transferItemModal = document.getElementById('transfer-item-modal');
     const transferItemForm = document.getElementById('transfer-item-form');
-    const transferItemModalTitle = document.getElementById('transfer-item-modal-title');
     const transferItemNameDisplay = document.getElementById('transfer-item-name-display');
     const transferItemSiteOriginDisplay = document.getElementById('transfer-item-site-origin-display');
     const cancelTransferItemButton = document.getElementById('cancel-transfer-item-button');
     const transferItemIdInput = document.getElementById('transfer-item-id');
     const transferSourceSiteIdInput = document.getElementById('transfer-source-site-id');
     const transferSourceSiteNameInput = document.getElementById('transfer-source-site-name');
-    const transferItemCurrentQuantityInput = document.getElementById('transfer-item-current-quantity');
     const transferSourceItemDataJsonInput = document.getElementById('transfer-source-item-data-json');
-    const transferCurrentQuantityDisplay = document.getElementById('transfer-current-quantity-display');
-    const destinationSiteIdSelect = document.getElementById('destination-site-id');
     const toggleZeroQtyCheckbox = document.getElementById('toggle-zero-qty');
+
 
     // --- Initial Page Setup ---
     if (currentYearSpan) {
@@ -85,24 +83,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function showAuthSection() {
         authSection.classList.remove('hidden');
         dashboardSection.classList.add('hidden');
-    }
-
-     // --- Filter Button Setup ---
-    function setupFilterButtons() {
-        const filterContainer = document.getElementById('site-filter-container');
-        if (!filterContainer) return;
-
-        filterContainer.addEventListener('click', (e) => {
-            if (e.target.matches('.filter-btn')) {
-                // Update active style
-                filterContainer.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active-filter-btn'));
-                e.target.classList.add('active-filter-btn');
-
-                // Update state and reload sites
-                currentSiteFilter = e.target.id.replace('filter-', ''); // "all", "obra", or "bodega"
-                loadConstructionSites();
-            }
-        });
     }
 
     function showSitesView() {
@@ -136,6 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (dashboardTitle) dashboardTitle.textContent = `Panel de ${userNameDisplay} (${currentUserRole})`;
                     showDashboardSection();
                     setupFilterButtons();
+                    setupSearch();
                     loadConstructionSites();
                 } else {
                     currentUserRole = null;
@@ -188,6 +169,165 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert(`Error al cerrar sesión: ${getFirebaseAuthErrorMessage(error)}`);
             });
         });
+    }
+
+     if (sitesList) {
+        sitesList.addEventListener('click', (event) => {
+            // Find the list item that was clicked by looking for the closest parent with the class '.site-item'
+            const siteItem = event.target.closest('.site-item');
+    
+            // If a site item was successfully found
+            if (siteItem) {
+                // Get the site ID and name from the data-* attributes
+                const siteId = siteItem.dataset.siteId;
+                const siteName = siteItem.dataset.siteName;
+                
+                // If both attributes exist, call the function
+                if (siteId && siteName) {
+                    showInventoryForSite(siteId, siteName);
+                }
+            }
+        });
+    }
+
+    // --- Search & Filter Functions (REPLACED/IMPROVED) ---
+    function setupSearch() {
+        const searchForm = document.getElementById('global-search-form');
+        const clearSearchBtn = document.getElementById('clear-search-btn');
+        if (searchForm) {
+            searchForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const searchTerm = document.getElementById('search-input').value.trim();
+                if (searchTerm) {
+                    handleGlobalSearch(searchTerm);
+                }
+            });
+        }
+        if (clearSearchBtn) {
+            clearSearchBtn.addEventListener('click', () => {
+                document.getElementById('search-input').value = '';
+                searchResultsContainer.classList.add('hidden');
+                sitesList.classList.remove('hidden');
+            });
+        }
+    }
+
+    function setupFilterButtons() {
+        const filterContainer = document.getElementById('site-filter-container');
+        if (!filterContainer) return;
+        filterContainer.addEventListener('click', (e) => {
+            if (e.target.matches('.filter-btn')) {
+                filterContainer.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active-filter-btn'));
+                e.target.classList.add('active-filter-btn');
+                currentSiteFilter = e.target.id.replace('filter-', '');
+                loadConstructionSites();
+            }
+        });
+    }
+
+    async function handleGlobalSearch(term) {
+        if (!searchResultsContainer) return;
+        searchResultsContainer.innerHTML = `<p class="text-nova-gray p-4">Buscando ítems...</p>`;
+        searchResultsContainer.classList.remove('hidden');
+        sitesList.classList.add('hidden');
+
+        try {
+            const endTerm = term.slice(0, -1) + String.fromCharCode(term.charCodeAt(term.length - 1) + 1);
+            const nameQuery = db.collection("inventoryItems").where('itemName', '>=', term).where('itemName', '<', endTerm).get();
+            const nuiQuery = db.collection("inventoryItems").where('nui', '>=', term).where('nui', '<', endTerm).get();
+            const serialQuery = db.collection("inventoryItems").where('serialModel', '>=', term).where('serialModel', '<', endTerm).get();
+            const [nameResults, nuiResults, serialResults] = await Promise.all([nameQuery, nuiQuery, serialQuery]);
+            
+            const results = new Map();
+            nameResults.forEach(doc => results.set(doc.id, { id: doc.id, ...doc.data() }));
+            nuiResults.forEach(doc => results.set(doc.id, { id: doc.id, ...doc.data() }));
+            serialResults.forEach(doc => results.set(doc.id, { id: doc.id, ...doc.data() }));
+
+            await renderSearchResults(Array.from(results.values()));
+        } catch (error) {
+            searchResultsContainer.innerHTML = `<p class="text-red-500 p-4">Error al buscar: ${error.message}</p>`;
+        }
+    }
+
+    async function renderSearchResults(items) {
+        if (!searchResultsContainer) return;
+        if (items.length === 0) {
+            searchResultsContainer.innerHTML = '<p class="text-nova-gray p-4">No se encontraron ítems.</p>';
+            return;
+        }
+
+        const sitesMap = new Map();
+        try {
+            const sitesSnapshot = await db.collection('constructionSites').get();
+            sitesSnapshot.forEach(doc => sitesMap.set(doc.id, doc.data()));
+        } catch { /* Continue without full site data if fails */ }
+        
+        let resultsHTML = '<ul class="space-y-3">';
+        items.forEach(item => {
+            const siteData = sitesMap.get(item.siteId);
+            const siteName = siteData ? siteData.name : 'Ubicación Desconocida';
+            const siteType = siteData ? (siteData.type === 'bodega' ? 'Bodega' : 'Obra') : '';
+            resultsHTML += `
+                <li class="bg-white p-4 rounded-lg shadow border border-nova-gray-light cursor-pointer hover:bg-gray-50" onclick="showInventoryForSite('${item.siteId}', '${siteName.replace(/'/g, "\\'")}')">
+                    <h5 class="text-lg font-semibold text-nova-green-dark">${item.itemName}</h5>
+                    <p class="text-sm font-bold text-nova-green">En: ${siteName} <span class="text-xs text-nova-gray-dark">(${siteType})</span></p>
+                    <div class="mt-2 text-sm text-nova-gray-dark">
+                        <p>NUI: <span class="font-medium text-black">${item.nui || 'N/A'}</span></p>
+                        <p>Serial/Modelo: <span class="font-medium text-black">${item.serialModel || 'N/A'}</span></p>
+                        <p>Cantidad: <span class="font-medium text-black">${item.quantity} ${item.unit || ''}</span></p>
+                    </div>
+                </li>
+            `;
+        });
+        resultsHTML += '</ul>';
+        searchResultsContainer.innerHTML = resultsHTML;
+    }
+
+    // --- Construction Site Functions (REPLACED/IMPROVED) ---
+    async function loadConstructionSites() {
+        if (!sitesList) return;
+        sitesList.innerHTML = '<p class="text-nova-gray p-4">Cargando ubicaciones...</p>';
+        
+        try {
+            let query = db.collection("constructionSites");
+            if (currentSiteFilter !== 'all') {
+                query = query.where("type", "==", currentSiteFilter);
+            }
+            const sitesSnapshot = await query.orderBy("createdAt", "desc").get();
+
+            if (sitesSnapshot.empty) {
+                let message = 'No hay ubicaciones registradas.';
+                if (currentSiteFilter === 'obra') message = `No hay obras registradas.`;
+                else if (currentSiteFilter === 'bodega') message = `No hay bodegas registradas.`;
+                sitesList.innerHTML = `<p class="text-nova-gray p-4">${message}</p>`;
+                return;
+            }
+
+            let sitesHTML = '<ul class="space-y-3">';
+            sitesSnapshot.forEach(doc => {
+                const site = doc.data();
+                const siteType = site.type === 'bodega' ? 'Bodega' : 'Obra';
+                const escapedSiteName = site.name.replace(/'/g, "\\'");
+                sitesHTML += `
+                    <li class="bg-nova-gray-light hover:bg-gray-200 p-4 rounded-lg shadow cursor-pointer" onclick="showInventoryForSite('${doc.id}', '${escapedSiteName}')">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <h4 class="text-lg text-nova-green-dark">${site.name} <span class="text-sm text-nova-gray-dark">(${siteType})</span></h4>
+                                ${site.address ? `<p class="text-sm text-nova-gray-dark">${site.address}</p>` : ''}
+                            </div>
+                            <span class="text-nova-green text-xl font-bold">&rarr;</span>
+                        </div>
+                    </li>`;
+            });
+            sitesHTML += '</ul>';
+            sitesList.innerHTML = sitesHTML;
+        } catch (error) {
+            let errorMessage = `Error al cargar ubicaciones: ${error.message}.`;
+            if (error.message.includes("The query requires an index")) {
+                errorMessage += ` <b>Acción Requerida:</b> Debe crear un índice compuesto en Firestore.`;
+            }
+            sitesList.innerHTML = `<p class="text-red-500 p-4">${errorMessage}</p>`;
+        }
     }
 
     // --- Login/Signup Forms (No Changes) ---
@@ -455,31 +595,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function loadConstructionSites() {
-        if (!sitesListContainer) return;
-        sitesListContainer.innerHTML = '<p class="text-nova-gray p-4">Cargando ubicaciones...</p>';
-        const user = auth.currentUser;
-        if (!user) return;
-
+        if (!sitesList) return;
+        sitesList.innerHTML = '<p class="text-nova-gray p-4">Cargando ubicaciones...</p>';
+        
         try {
-            // Start with the base query
             let query = db.collection("constructionSites");
-
-            // Conditionally add the filter
             if (currentSiteFilter !== 'all') {
                 query = query.where("type", "==", currentSiteFilter);
             }
-
-            // Add ordering and get the documents
             const sitesSnapshot = await query.orderBy("createdAt", "desc").get();
 
             if (sitesSnapshot.empty) {
-                let message = 'No hay ubicaciones registradas en el sistema.';
-                if (currentSiteFilter === 'obra') {
-                    message = `No hay obras registradas.`;
-                } else if (currentSiteFilter === 'bodega') {
-                    message = `No hay bodegas registradas.`;
-                }
-                sitesListContainer.innerHTML = `<p class="text-nova-gray p-4">${message}</p>`;
+                let message = 'No hay ubicaciones registradas.';
+                if (currentSiteFilter === 'obra') message = `No hay obras registradas.`;
+                else if (currentSiteFilter === 'bodega') message = `No hay bodegas registradas.`;
+                sitesList.innerHTML = `<p class="text-nova-gray p-4">${message}</p>`;
                 return;
             }
 
@@ -487,35 +617,30 @@ document.addEventListener('DOMContentLoaded', () => {
             sitesSnapshot.forEach(doc => {
                 const site = doc.data();
                 const siteType = site.type === 'bodega' ? 'Bodega' : 'Obra';
-                const escapedSiteName = site.name.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-                const escapedSiteAddress = site.address ? site.address.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : '';
+                const escapedSiteName = site.name.replace(/'/g, "\\'");
+                // In loadConstructionSites function, inside the forEach loop
                 sitesHTML += `
-                    <li class="bg-nova-gray-light hover:bg-gray-200 p-4 rounded-lg shadow cursor-pointer transition-colors duration-150 flex justify-between items-center" data-site-id="${doc.id}" data-site-name="${escapedSiteName}">
-                        <div>
-                            <h4 class="text-lg text-nova-green-dark">${escapedSiteName} <span class="text-sm text-nova-gray-dark">(${siteType})</span></h4>
-                            ${escapedSiteAddress ? `<p class="text-sm text-nova-gray-dark">${escapedSiteAddress}</p>` : ''}
+                    <li class="bg-nova-gray-light hover:bg-gray-200 p-4 rounded-lg shadow cursor-pointer site-item" 
+                        data-site-id="${doc.id}" 
+                        data-site-name="${escapedSiteName}">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <h4 class="text-lg text-nova-green-dark">${site.name} <span class="text-sm text-nova-gray-dark">(${siteType})</span></h4>
+                                ${site.address ? `<p class="text-sm text-nova-gray-dark">${site.address}</p>` : ''}
+                            </div>
+                            <span class="text-nova-green text-xl font-bold">&rarr;</span>
                         </div>
-                        <span class="text-nova-green text-xl font-bold">&rarr;</span>
                     </li>
                 `;
             });
             sitesHTML += '</ul>';
-            sitesListContainer.innerHTML = sitesHTML;
-
-            // Re-attach listeners
-            document.querySelectorAll('#sites-list li').forEach(item => {
-                item.addEventListener('click', () => {
-                    const siteId = item.dataset.siteId;
-                    const siteName = item.dataset.siteName;
-                    showInventoryForSite(siteId, siteName);
-                });
-            });
+            sitesList.innerHTML = sitesHTML;
         } catch (error) {
-            let errorMessage = `Error al cargar las ubicaciones: ${error.message}.`;
+            let errorMessage = `Error al cargar ubicaciones: ${error.message}.`;
             if (error.message.includes("The query requires an index")) {
-                errorMessage += ` <b>Acción Requerida:</b> Debe crear un índice compuesto en Firestore. Busque un enlace en la consola de errores del navegador (F12) para crearlo.`;
+                errorMessage += ` <b>Acción Requerida:</b> Debe crear un índice compuesto en Firestore.`;
             }
-            sitesListContainer.innerHTML = `<p class="text-red-500 p-4">${errorMessage}</p>`;
+            sitesList.innerHTML = `<p class="text-red-500 p-4">${errorMessage}</p>`;
         }
     }
 
@@ -1164,11 +1289,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const newItemQuantityEl = adjustQuantityForm.elements['newItemQuantity'];
         const adjustmentReasonEl = adjustQuantityForm.elements['adjustmentReason'];
         const errorElement = document.getElementById('adjust-quantity-error');
-        if (newItemQuantityEl) newItemQuantityEl.value = '';
+        if (newItemQuantityEl) {
+            newItemQuantityEl.value = '';
+            newItemQuantityEl.focus();
+        }
         if (adjustmentReasonEl) adjustmentReasonEl.value = '';
         if (errorElement) errorElement.textContent = '';
         adjustQuantityModal.classList.remove('hidden');
-        if (newItemQuantityEl) newItemQuantityEl.focus();
     }
 
     async function handleAdjustQuantitySubmit(event, itemId, oldQuantity, siteId, siteName, itemName) {
