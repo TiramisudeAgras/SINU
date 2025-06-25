@@ -91,33 +91,21 @@
                         </div>
                     </div>
                     
-                    <form id="global-search-form" class="mb-4 border-b pb-4">
-                        <label for="search-input" class="block text-sm font-medium text-gray-700 mb-1">Buscar Ítem por Nombre, NUI, o Serial/Modelo en todas las ubicaciones</label>
-                        <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-                            <input type="text" id="search-input" name="searchInput" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm" placeholder="Ej: Martillo, NUI-F4B12, etc.">
-                            <button type="submit" class="w-full sm:w-auto justify-center flex items-center bg-nova-green hover:bg-nova-green-dark text-white font-bold py-2 px-4 rounded">Buscar</button>
-                            <button type="button" id="clear-search-btn" class="w-full sm:w-auto justify-center flex items-center bg-gray-300 hover:bg-gray-400 text-black py-2 px-4 rounded">Limpiar</button>
-                        </div>
-                    </form>
-                    
                     <div id="add-site-form-container" class="mb-4">
                         <!-- Add Site Form will be rendered here by JS -->
                     </div>
 
-                    <!-- Filter Buttons -->
-                    <div id="site-filter-container" class="flex space-x-2 mb-4">
+                    <!-- START: Filter Buttons -->
+                    <div id="site-filter-container" class="flex space-x-2 mb-4 border-b pb-4">
                         <button id="filter-all" class="filter-btn active-filter-btn">Todos</button>
                         <button id="filter-obra" class="filter-btn">Obras</button>
                         <button id="filter-bodega" class="filter-btn">Bodegas</button>
                     </div>
-                    
-                    <!-- This container holds EITHER the site list OR the search results -->
-                    <div id="list-and-results-container" class="min-h-[200px]">
+                    <!-- END: Filter Buttons -->
+
+                    <div id="sites-list-container" class="min-h-[200px]">
                         <div id="sites-list">
-                            <!-- List of sites will be populated here by JavaScript -->
-                        </div>
-                        <div id="search-results-container" class="hidden">
-                            <!-- Search results will be populated here by JavaScript -->
+                            <p class="text-nova-gray">Cargando ubicaciones...</p>
                         </div>
                     </div>
                 </div>
@@ -154,7 +142,7 @@
         </footer>
     </div>
 
-    <!-- Modals (No changes needed) -->
+    <!-- Modals -->
     <div id="history-modal" class="fixed inset-0 bg-gray-800 bg-opacity-75 overflow-y-auto h-full w-full flex items-center justify-center hidden z-50 p-4">
         <div class="relative mx-auto p-5 sm:p-6 border w-full max-w-2xl shadow-lg rounded-md bg-white">
             <div class="mt-3">
@@ -171,114 +159,158 @@
             </div>
         </div>
     </div>
+
     <div id="edit-item-modal" class="fixed inset-0 bg-gray-800 bg-opacity-75 overflow-y-auto h-full w-full flex items-center justify-center hidden z-50 p-4">
         <div class="relative mx-auto p-5 sm:p-6 border w-full max-w-lg shadow-lg rounded-md bg-white">
             <form id="edit-item-form"> 
                 <h3 class="text-xl leading-6 font-bold text-nova-green-dark text-center mb-6" id="edit-item-modal-title">Editar Ítem de Inventario</h3>
+                
                 <div class="space-y-4 max-h-[60vh] sm:max-h-[70vh] overflow-y-auto pr-2 mb-6">
                     <input type="hidden" id="edit-item-id">
                     <input type="hidden" id="edit-item-site-id">
                     <input type="hidden" id="edit-item-site-name">
+
                     <div>
                         <label for="edit-item-name" class="block text-sm font-medium text-nova-gray-dark">Nombre del Ítem</label>
-                        <input type="text" id="edit-item-name" name="itemName" required class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
+                        <input type="text" id="edit-item-name" name="itemName" required
+                               class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
                     </div>
                     <div>
                         <label for="edit-item-unit" class="block text-sm font-medium text-nova-gray-dark">Unidad</label>
-                        <input type="text" id="edit-item-unit" name="itemUnit" required placeholder="Ej: bolsas, kg, mts, und." class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
+                        <input type="text" id="edit-item-unit" name="itemUnit" required placeholder="Ej: bolsas, kg, mts, und."
+                               class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
                     </div>
                     <div>
                         <label for="edit-item-serial-model" class="block text-sm font-medium text-nova-gray-dark">Serial/Modelo</label>
-                        <input type="text" id="edit-item-serial-model" name="itemSerialModel" class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
+                        <input type="text" id="edit-item-serial-model" name="itemSerialModel"
+                               class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
                     </div>
                     <div>
                         <label for="edit-item-condition" class="block text-sm font-medium text-nova-gray-dark">Estado</label>
-                        <input type="text" id="edit-item-condition" name="itemCondition" placeholder="Ej: Buen Estado, Por Reparar" class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
+                        <input type="text" id="edit-item-condition" name="itemCondition" placeholder="Ej: Buen Estado, Por Reparar"
+                               class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
                     </div>
                     <div>
                         <label for="edit-item-description" class="block text-sm font-medium text-nova-gray-dark">Observaciones</label>
-                        <textarea id="edit-item-description" name="itemDescription" rows="3" class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"></textarea>
+                        <textarea id="edit-item-description" name="itemDescription" rows="3"
+                                  class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"></textarea>
                     </div>
-                </div>
+                    </div>
+
                 <p id="edit-item-error" class="my-2 text-center text-sm text-red-600"></p>
+                
                 <div class="flex justify-end space-x-3">
-                    <button type="button" id="cancel-edit-item-button" class="px-4 py-2 bg-gray-200 text-gray-700 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-colors duration-150">Cancelar</button>
-                    <button type="submit" class="px-4 py-2 bg-nova-green hover:bg-nova-green-dark text-white text-base font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nova-green transition-colors duration-150">Guardar Cambios</button>
+                    <button type="button" id="cancel-edit-item-button"
+                            class="px-4 py-2 bg-gray-200 text-gray-700 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-colors duration-150">
+                        Cancelar
+                    </button>
+                    <button type="submit"
+                            class="px-4 py-2 bg-nova-green hover:bg-nova-green-dark text-white text-base font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nova-green transition-colors duration-150">
+                        Guardar Cambios
+                    </button>
                 </div>
             </form>
         </div>
     </div>
+
     <div id="adjust-quantity-modal" class="fixed inset-0 bg-gray-800 bg-opacity-75 overflow-y-auto h-full w-full flex items-center justify-center hidden z-50 p-4">
         <div class="relative mx-auto p-5 sm:p-6 border w-full max-w-md shadow-lg rounded-md bg-white">
             <form id="adjust-quantity-form">
                 <h3 class="text-xl leading-6 font-bold text-nova-green-dark text-center mb-2" id="adjust-quantity-modal-title">Ajustar Cantidad</h3>
                 <p class="text-sm text-center text-nova-gray-dark mb-4" id="adjust-quantity-item-name">Ítem: </p>
+                
                 <input type="hidden" id="adjust-item-id">
                 <input type="hidden" id="adjust-item-site-id">
                 <input type="hidden" id="adjust-item-site-name">
                 <input type="hidden" id="adjust-item-current-quantity">
-                <input type="hidden" id="adjust-item-name-hidden">
-                <div class="space-y-4 max-h-[60vh] sm:max-h-[70vh] overflow-y-auto pr-2 mb-6">
+                <input type="hidden" id="adjust-item-name-hidden"> <div class="space-y-4 max-h-[60vh] sm:max-h-[70vh] overflow-y-auto pr-2 mb-6">
                     <div>
                         <label for="current-item-quantity-display" class="block text-sm font-medium text-nova-gray-dark">Cantidad Actual</label>
-                        <input type="text" id="current-item-quantity-display" name="currentItemQuantityDisplay" readonly class="mt-1 block w-full px-3 py-2 border-gray-300 bg-gray-100 rounded-md shadow-sm sm:text-sm">
+                        <input type="text" id="current-item-quantity-display" name="currentItemQuantityDisplay" readonly
+                               class="mt-1 block w-full px-3 py-2 border-gray-300 bg-gray-100 rounded-md shadow-sm sm:text-sm">
                     </div>
                     <div>
                         <label for="new-item-quantity" class="block text-sm font-medium text-nova-gray-dark">Nueva Cantidad Total</label>
-                        <input type="number" id="new-item-quantity" name="newItemQuantity" required min="0" step="any" class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
+                        <input type="number" id="new-item-quantity" name="newItemQuantity" required min="0" step="any"
+                               class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
                     </div>
                     <div>
                         <label for="adjustment-reason" class="block text-sm font-medium text-nova-gray-dark">Motivo del Ajuste</label>
-                        <input type="text" id="adjustment-reason" name="adjustmentReason" required placeholder="Ej: Uso en obra, Conteo físico, Daño" class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
+                        <input type="text" id="adjustment-reason" name="adjustmentReason" required placeholder="Ej: Uso en obra, Conteo físico, Daño"
+                               class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
                     </div>
                 </div>
+
                 <p id="adjust-quantity-error" class="my-2 text-center text-sm text-red-600"></p>
+                
                 <div class="mt-6 flex justify-end space-x-3">
-                    <button type="button" id="cancel-adjust-quantity-button" class="px-4 py-2 bg-gray-200 text-gray-700 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-colors duration-150">Cancelar</button>
-                    <button type="submit" class="px-4 py-2 bg-nova-green hover:bg-nova-green-dark text-white text-base font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nova-green transition-colors duration-150">Confirmar Ajuste</button>
+                    <button type="button" id="cancel-adjust-quantity-button"
+                            class="px-4 py-2 bg-gray-200 text-gray-700 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-colors duration-150">
+                        Cancelar
+                    </button>
+                    <button type="submit"
+                            class="px-4 py-2 bg-nova-green hover:bg-nova-green-dark text-white text-base font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nova-green transition-colors duration-150">
+                        Confirmar Ajuste
+                    </button>
                 </div>
             </form>
         </div>
     </div>
+
     <div id="transfer-item-modal" class="fixed inset-0 bg-gray-800 bg-opacity-75 overflow-y-auto h-full w-full flex items-center justify-center hidden z-50 p-4">
         <div class="relative mx-auto p-5 sm:p-6 border w-full max-w-lg shadow-lg rounded-md bg-white">
             <form id="transfer-item-form">
                 <h3 class="text-xl leading-6 font-bold text-nova-green-dark text-center mb-2" id="transfer-item-modal-title">Transferir Ítem de Inventario</h3>
                 <p class="text-sm text-center text-nova-gray-dark mb-1" id="transfer-item-name-display">Ítem: </p>
                 <p class="text-xs text-center text-nova-gray-dark mb-4" id="transfer-item-site-origin-display">Desde: </p>
+                
                 <input type="hidden" id="transfer-item-id">
                 <input type="hidden" id="transfer-source-site-id">
                 <input type="hidden" id="transfer-source-site-name">
                 <input type="hidden" id="transfer-item-current-quantity">
                 <input type="hidden" id="transfer-source-item-data-json">
+
                 <div class="space-y-4 max-h-[60vh] sm:max-h-[70vh] overflow-y-auto pr-2 mb-6">
                     <div>
                         <label for="transfer-current-quantity-display" class="block text-sm font-medium text-nova-gray-dark">Cantidad Actual en Origen</label>
-                        <input type="text" id="transfer-current-quantity-display" readonly class="mt-1 block w-full px-3 py-2 border-gray-300 bg-gray-100 rounded-md shadow-sm sm:text-sm">
+                        <input type="text" id="transfer-current-quantity-display" readonly
+                               class="mt-1 block w-full px-3 py-2 border-gray-300 bg-gray-100 rounded-md shadow-sm sm:text-sm">
                     </div>
                     <div>
                         <label for="quantity-to-transfer" class="block text-sm font-medium text-nova-gray-dark">Cantidad a Transferir</label>
-                        <input type="number" id="quantity-to-transfer" name="quantityToTransfer" required min="0.01" step="any" class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
+                        <input type="number" id="quantity-to-transfer" name="quantityToTransfer" required min="0.01" step="any"
+                               class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
                     </div>
                     <div>
                         <label for="destination-site-id" class="block text-sm font-medium text-nova-gray-dark">Obra/Bodega de Destino</label>
-                        <select id="destination-site-id" name="destinationSiteId" required class="mt-1 block w-full px-3 py-2 border border-nova-gray bg-white rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
+                        <select id="destination-site-id" name="destinationSiteId" required
+                                class="mt-1 block w-full px-3 py-2 border border-nova-gray bg-white rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
                             <option value="">Seleccione destino...</option>
-                        </select>
+                            </select>
                     </div>
                     <div>
                         <label for="transfer-reason" class="block text-sm font-medium text-nova-gray-dark">Motivo/Notas de la Transferencia</label>
-                        <input type="text" id="transfer-reason" name="transferReason" required placeholder="Ej: Traslado para nueva fase" class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
+                        <input type="text" id="transfer-reason" name="transferReason" required placeholder="Ej: Traslado para nueva fase"
+                               class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
                     </div>
                 </div>
+
                 <p id="transfer-item-error" class="my-2 text-center text-sm text-red-600"></p>
+                
                 <div class="mt-6 flex justify-end space-x-3">
-                    <button type="button" id="cancel-transfer-item-button" class="px-4 py-2 bg-gray-200 text-gray-700 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-colors duration-150">Cancelar</button>
-                    <button type="submit" class="px-4 py-2 bg-nova-green hover:bg-nova-green-dark text-white text-base font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nova-green transition-colors duration-150">Confirmar Transferencia</button>
+                    <button type="button" id="cancel-transfer-item-button"
+                            class="px-4 py-2 bg-gray-200 text-gray-700 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-colors duration-150">
+                        Cancelar
+                    </button>
+                    <button type="submit"
+                            class="px-4 py-2 bg-nova-green hover:bg-nova-green-dark text-white text-base font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nova-green transition-colors duration-150">
+                        Confirmar Transferencia
+                    </button>
                 </div>
             </form>
         </div>
     </div>
+
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
