@@ -712,73 +712,94 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function exportInventoryToCsv() {
-        const siteId = inventorySection.dataset.currentSiteId;
-        const siteName = inventorySection.dataset.currentSiteName;
+    const siteId = inventorySection.dataset.currentSiteId;
+    const siteName = inventorySection.dataset.currentSiteName;
 
-        if (!siteId) {
-            alert("No se ha seleccionado una ubicación para exportar.");
+    if (!siteId) {
+        alert("No se ha seleccionado una ubicación para exportar.");
+        return;
+    }
+
+    try {
+        const inventorySnapshot = await db.collection("inventoryItems")
+            .where("siteId", "==", siteId)
+            .orderBy("itemName", "asc")
+            .get();
+
+        if (inventorySnapshot.empty) {
+            alert(`No hay ítems de inventario para exportar en ${siteName}.`);
             return;
         }
 
-        try {
-            const inventorySnapshot = await db.collection("inventoryItems")
-                .where("siteId", "==", siteId)
-                .orderBy("itemName", "asc")
-                .get();
+        const headers = [
+            "NUI",
+            "Nombre del Ítem",
+            "Cantidad",
+            "Unidad",
+            "Serial/Modelo",
+            "Estado",
+            "Observaciones",
+            "Estatus",
+            "Última Actualización"
+        ];
 
-            if (inventorySnapshot.empty) {
-                alert(`No hay ítems de inventario para exportar en ${siteName}.`);
-                return;
+        // --- INICIO DE LA SECCIÓN MEJORADA ---
+
+        // Función auxiliar para formatear cada campo de forma segura para CSV
+        const toCsvField = (value) => {
+            const stringValue = String(value === undefined || value === null ? '' : value);
+            // Si el valor contiene comas, comillas o saltos de línea, lo encapsulamos entre comillas dobles.
+            // También, duplicamos cualquier comilla doble que ya exista dentro del valor.
+            if (/[",\n\r]/.test(stringValue)) {
+                return `"${stringValue.replace(/"/g, '""')}"`;
             }
+            return stringValue;
+        };
 
-            // --- ESTA SECCIÓN HA SIDO ACTUALIZADA A ESPAÑOL ---
-            const headers = [
-                "NUI",
-                "Nombre del Ítem",
-                "Cantidad",
-                "Unidad",
-                "Serial/Modelo",
-                "Estado",
-                "Observaciones",
-                "Estatus",
-                "Última Actualización"
+        const rows = inventorySnapshot.docs.map(doc => {
+            const item = doc.data();
+            
+            // 1. Formatear la fecha a un estándar sin comas (YYYY-MM-DD HH:MM:SS)
+            let lastUpdated = 'N/A';
+            if (item.lastUpdatedAt && item.lastUpdatedAt.toDate) {
+                const d = item.lastUpdatedAt.toDate();
+                const pad = (num) => String(num).padStart(2, '0');
+                lastUpdated = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+            }
+            
+            // 2. Mapear los datos a un array
+            const rowData = [
+                item.nui,
+                item.itemName,
+                item.quantity,
+                item.unit,
+                item.serialModel,
+                item.condition, // Este es el campo que daba problemas
+                item.description,
+                item.status,
+                lastUpdated
             ];
 
-            const rows = inventorySnapshot.docs.map(doc => {
-                const item = doc.data();
-                const lastUpdated = item.lastUpdatedAt && item.lastUpdatedAt.toDate
-                    ? item.lastUpdatedAt.toDate().toLocaleString('es-CO')
-                    : 'N/A';
-                    
-                return [
-                    item.nui || '',
-                    item.itemName || '',
-                    item.quantity !== undefined ? item.quantity : '',
-                    item.unit || '',
-                    item.serialModel || '',
-                    item.condition || '',
-                    // Escapa comillas y saltos de línea en las observaciones
-                    `"${(item.description || '').replace(/"/g, '""')}"`, 
-                    item.status || 'Disponible',
-                    lastUpdated
-                ].join(',');
-            });
+            // 3. Aplicar el formato seguro a cada campo y luego unirlos
+            return rowData.map(toCsvField).join(',');
+        });
 
-            const csvContent = [headers.join(','), ...rows].join('\n');
-            // Agrega un BOM para asegurar la correcta visualización de tildes en Excel
-            const bom = new Uint8Array([0xEF, 0xBB, 0xBF]); 
-            const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8;' });
-            
-            const safeSiteName = siteName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-            const fileName = `inventario_${safeSiteName}_${new Date().toISOString().slice(0, 10)}.csv`;
-            
-            downloadCsv(blob, fileName); // Modificado para pasar el blob directamente
+        // --- FIN DE LA SECCIÓN MEJORADA ---
 
-        } catch (error) {
-            console.error("Error al exportar a CSV:", error);
-            alert(`Error al exportar los datos: ${error.message}`);
-        }
+        const csvContent = [headers.join(','), ...rows].join('\n');
+        const bom = new Uint8Array([0xEF, 0xBB, 0xBF]); 
+        const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8;' });
+        
+        const safeSiteName = siteName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        const fileName = `inventario_${safeSiteName}_${new Date().toISOString().slice(0, 10)}.csv`;
+        
+        downloadCsv(blob, fileName);
+
+    } catch (error) {
+        console.error("Error al exportar a CSV:", error);
+        alert(`Error al exportar los datos: ${error.message}`);
     }
+}
 
     /**
      * Dispara la descarga de un archivo en el navegador.
