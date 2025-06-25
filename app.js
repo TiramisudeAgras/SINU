@@ -529,6 +529,13 @@ document.addEventListener('DOMContentLoaded', () => {
         inventorySection.dataset.currentSiteName = siteName;
         loadInventoryItems(siteId, siteName);
         renderAddInventoryItemButton(siteId, siteName);
+
+        const exportButton = document.getElementById('export-csv-button');
+            if (exportButton) {
+            const newExportButton = exportButton.cloneNode(true);
+            exportButton.parentNode.replaceChild(newExportButton, exportButton);
+            newExportButton.addEventListener('click', exportInventoryToCsv);
+        }
     }
 
     if (backToSitesButton) {
@@ -701,6 +708,93 @@ document.addEventListener('DOMContentLoaded', () => {
             if (error.message.includes("index")) {
                 tableBody.innerHTML += `<tr><td colspan="6" class="px-6 py-4 whitespace-nowrap text-sm text-red-400">Es posible que necesite crear un índice compuesto en Firestore.</td></tr>`;
             }
+        }
+    }
+
+    async function exportInventoryToCsv() {
+        const siteId = inventorySection.dataset.currentSiteId;
+        const siteName = inventorySection.dataset.currentSiteName;
+
+        if (!siteId) {
+            alert("No se ha seleccionado una ubicación para exportar.");
+            return;
+        }
+
+        try {
+            const inventorySnapshot = await db.collection("inventoryItems")
+                .where("siteId", "==", siteId)
+                .orderBy("itemName", "asc")
+                .get();
+
+            if (inventorySnapshot.empty) {
+                alert(`No hay ítems de inventario para exportar en ${siteName}.`);
+                return;
+            }
+
+            // --- ESTA SECCIÓN HA SIDO ACTUALIZADA A ESPAÑOL ---
+            const headers = [
+                "NUI",
+                "Nombre del Ítem",
+                "Cantidad",
+                "Unidad",
+                "Serial/Modelo",
+                "Estado",
+                "Observaciones",
+                "Estatus",
+                "Última Actualización"
+            ];
+
+            const rows = inventorySnapshot.docs.map(doc => {
+                const item = doc.data();
+                const lastUpdated = item.lastUpdatedAt && item.lastUpdatedAt.toDate
+                    ? item.lastUpdatedAt.toDate().toLocaleString('es-CO')
+                    : 'N/A';
+                    
+                return [
+                    item.nui || '',
+                    item.itemName || '',
+                    item.quantity !== undefined ? item.quantity : '',
+                    item.unit || '',
+                    item.serialModel || '',
+                    item.condition || '',
+                    // Escapa comillas y saltos de línea en las observaciones
+                    `"${(item.description || '').replace(/"/g, '""')}"`, 
+                    item.status || 'Disponible',
+                    lastUpdated
+                ].join(',');
+            });
+
+            const csvContent = [headers.join(','), ...rows].join('\n');
+            // Agrega un BOM para asegurar la correcta visualización de tildes en Excel
+            const bom = new Uint8Array([0xEF, 0xBB, 0xBF]); 
+            const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8;' });
+            
+            const safeSiteName = siteName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+            const fileName = `inventario_${safeSiteName}_${new Date().toISOString().slice(0, 10)}.csv`;
+            
+            downloadCsv(blob, fileName); // Modificado para pasar el blob directamente
+
+        } catch (error) {
+            console.error("Error al exportar a CSV:", error);
+            alert(`Error al exportar los datos: ${error.message}`);
+        }
+    }
+
+    /**
+     * Dispara la descarga de un archivo en el navegador.
+     * @param {Blob} blob El contenido del archivo como un objeto Blob.
+     * @param {string} fileName El nombre del archivo a descargar.
+     */
+    function downloadCsv(blob, fileName) {
+        const link = document.createElement("a");
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", fileName);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
     }
 

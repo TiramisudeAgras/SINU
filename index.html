@@ -87,22 +87,17 @@
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-xl font-semibold text-nova-green-dark">Ubicaciones (Obras y Bodegas)</h3>
                         <div id="add-site-button-container">
-                            <!-- Add Site Button will be rendered here by JS -->
-                        </div>
+                            </div>
                     </div>
                     
                     <div id="add-site-form-container" class="mb-4">
-                        <!-- Add Site Form will be rendered here by JS -->
-                    </div>
+                        </div>
 
-                    <!-- START: Filter Buttons -->
                     <div id="site-filter-container" class="flex space-x-2 mb-4 border-b pb-4">
                         <button id="filter-all" class="filter-btn active-filter-btn">Todos</button>
                         <button id="filter-obra" class="filter-btn">Obras</button>
                         <button id="filter-bodega" class="filter-btn">Bodegas</button>
                     </div>
-                    <!-- END: Filter Buttons -->
-
                     <div id="sites-list-container" class="min-h-[200px]">
                         <div id="sites-list">
                             <p class="text-nova-gray">Cargando ubicaciones...</p>
@@ -118,7 +113,15 @@
                         </button>
                     </div>
 
-                    <div class="flex items-center justify-end mb-4">
+                    <div class="flex items-center justify-between mb-4">
+                        <div id="add-item-form-container" class="mb-6">
+                            </div>
+
+                        <div id="export-button-container" class="mb-6">
+                            <button id="export-csv-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition-colors duration-150">
+                                Exportar a CSV
+                            </button>
+                        </div>
                         <label for="toggle-zero-qty" class="flex items-center cursor-pointer">
                             <span class="mr-3 text-sm font-medium text-nova-gray-dark">Mostrar ítems sin stock</span>
                             <div class="relative">
@@ -128,11 +131,8 @@
                         </label>
                     </div>
 
-                    <div id="add-item-form-container" class="mb-6">
-                    </div>
                     <div id="inventory-list" class="mb-4">
-                        <!-- Inventory table will be rendered here by JS -->
-                    </div>
+                        </div>
                 </div>
             </section>
         </main>
@@ -142,7 +142,6 @@
         </footer>
     </div>
 
-    <!-- Modals -->
     <div id="history-modal" class="fixed inset-0 bg-gray-800 bg-opacity-75 overflow-y-auto h-full w-full flex items-center justify-center hidden z-50 p-4">
         <div class="relative mx-auto p-5 sm:p-6 border w-full max-w-2xl shadow-lg rounded-md bg-white">
             <div class="mt-3">
