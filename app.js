@@ -2,7 +2,9 @@
 
 document.addEventListener('DOMContentLoaded', () => {
 
-    // -- START: Firebase Configuration --
+     // Initialize the global object first
+    window.SINU_APP = window.SINU_APP || {};
+    
     const firebaseConfig = {
         apiKey: "AIzaSyDydDrSWx8eS3MgLfdpzbWWxTrxBaUINvU",
         authDomain: "sinu-nova-urbano.firebaseapp.com",
@@ -13,7 +15,6 @@ document.addEventListener('DOMContentLoaded', () => {
         measurementId: "G-LZ4R7S6EPG"
     };
 
-    window.SINU_APP = {}; 
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();

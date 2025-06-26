@@ -2,7 +2,7 @@
 window.SINU_APP = window.SINU_APP || {};
 
 //
-// DEFINE THE FUNCTION IN THE GLOBAL SCOPE
+// DEFINE THE FUNCTION IN THE GLOBAL SCOPE - This happens immediately when the script loads
 //
 window.SINU_APP.loadAdminUsers = async () => {
     const userListContainer = document.getElementById('user-list-container');
@@ -70,7 +70,8 @@ window.SINU_APP.loadAdminUsers = async () => {
     }
 };
 
-const toggleUserApproval = async (e) => {
+// Define toggleUserApproval in the global scope as well
+window.SINU_APP.toggleUserApproval = async (e) => {
     const uid = e.target.dataset.uid;
     const currentlyApproved = e.target.dataset.isApproved === 'true';
     const db = window.SINU_APP.db;
@@ -89,6 +90,8 @@ const toggleUserApproval = async (e) => {
     }
 };
 
+// Keep the local reference for the event listener
+const toggleUserApproval = window.SINU_APP.toggleUserApproval;
 
 //
 // ATTACH EVENT LISTENERS AFTER THE DOM IS LOADED
