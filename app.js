@@ -90,6 +90,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const addMaintenanceModal = document.getElementById('add-maintenance-modal');
     const addMaintenanceForm = document.getElementById('add-maintenance-form');
     const cancelAddMaintenanceButton = document.getElementById('cancel-add-maintenance-button');
+    // Export History
+    const exportHistoryPdfBtn = document.getElementById('export-history-pdf');
 
     // --- Initial Page Setup ---
     if (currentYearSpan) {
@@ -1506,6 +1508,10 @@ auth.onAuthStateChanged(async user => {
         historyModalTitle.textContent = `Historial para: ${escapedItemName}`;
         historyModalContent.innerHTML = '<p class="text-nova-gray p-4">Cargando historial...</p>';
         historyModal.classList.remove('hidden');
+
+        // Store data for PDF export
+        historyModal.dataset.itemId = itemId;
+        historyModal.dataset.itemName = itemName;
         try {
             const historySnapshot = await db.collection("inventoryItems").doc(itemId).collection("history").orderBy("timestamp", "desc").get();
             if (historySnapshot.empty) {
@@ -1541,6 +1547,164 @@ auth.onAuthStateChanged(async user => {
             historyModalContent.innerHTML = `<p class="text-red-500 p-4">Error al cargar el historial: ${error.message}</p>`;
         }
     }
+
+    async function exportHistoryToPDF() {
+    const itemId = historyModal.dataset.itemId;
+    const itemName = historyModal.dataset.itemName;
+    
+    if (!itemId || !window.jspdf) {
+        alert('Error: No se puede generar el PDF.');
+        return;
+    }
+    
+    try {
+        const { jsPDF } = window.jspdf;
+        // Create PDF in LANDSCAPE orientation
+        const doc = new jsPDF('landscape', 'mm', 'a4');
+        
+        // Header
+        doc.setFontSize(20);
+        doc.setTextColor(6, 78, 59); // Nova green dark
+        doc.text('NOVA URBANO SAS', 148, 20, { align: 'center' }); // Centered for landscape
+        
+        doc.setFontSize(16);
+        doc.text('Historial de Movimientos', 148, 30, { align: 'center' });
+        
+        // Item info
+        doc.setFontSize(12);
+        doc.setTextColor(0, 0, 0);
+        doc.text(`Ítem: ${itemName}`, 20, 45);
+        
+        // Get the item details for more info
+        const itemDoc = await db.collection("inventoryItems").doc(itemId).get();
+        if (itemDoc.exists) {
+            const itemData = itemDoc.data();
+            doc.text(`NUI: ${itemData.nui || 'N/A'}`, 20, 52);
+            if (itemData.serialModel) {
+                doc.text(`Serial/Modelo: ${itemData.serialModel}`, 20, 59);
+            }
+            
+            // Get site name
+            const siteDoc = await db.collection("constructionSites").doc(itemData.siteId).get();
+            if (siteDoc.exists) {
+                doc.text(`Ubicación Actual: ${siteDoc.data().name}`, 20, 66);
+            }
+        }
+        
+        // Report metadata - positioned to the right for landscape
+        doc.setFontSize(10);
+        doc.setTextColor(100, 100, 100);
+        const reportDate = new Date().toLocaleString('es-CO');
+        doc.text(`Fecha del reporte: ${reportDate}`, 200, 52);
+        
+        const currentUser = auth.currentUser;
+        let generatedBy = 'Usuario';
+        if (currentUser) {
+            const userDoc = await db.collection("users").doc(currentUser.uid).get();
+            if (userDoc.exists) {
+                const userData = userDoc.data();
+                generatedBy = `${userData.nombre || ''} ${userData.apellidos || ''}`.trim() || currentUser.email;
+            }
+        }
+        doc.text(`Generado por: ${generatedBy}`, 200, 59);
+        
+        // Get history entries
+        const historySnapshot = await db.collection("inventoryItems").doc(itemId).collection("history").orderBy("timestamp", "desc").get();
+        
+        if (historySnapshot.empty) {
+            doc.text('No hay movimientos registrados.', 20, 95);
+        } else {
+            // Prepare table data
+            const tableData = [];
+            
+            historySnapshot.forEach(doc => {
+                const log = doc.data();
+                const logDate = log.timestamp ? new Date(log.timestamp.seconds * 1000).toLocaleString('es-CO', {
+                    dateStyle: 'short',
+                    timeStyle: 'short'
+                }) : 'N/A';
+                
+                const user = `${log.userName || 'N/A'} ${log.userApellidos || ''}`.trim();
+                
+                // Create a summary of the action
+                let actionSummary = log.action || 'Acción desconocida';
+                let details = '';
+                
+                switch (log.action) {
+                    case 'CREADO':
+                        details = `Cantidad inicial: ${log.details?.createdWithQuantity || 'N/A'} ${log.details?.unit || ''}`;
+                        break;
+                    case 'CANTIDAD_AJUSTADA':
+                        details = `De ${log.details?.oldQuantity || 'N/A'} a ${log.details?.newQuantity || 'N/A'} - ${log.details?.reason || 'Sin motivo'}`;
+                        break;
+                    case 'TRANSFERENCIA_SALIDA':
+                        details = `${log.details?.quantityTransferred || 'N/A'} unidades a ${log.details?.toSiteName || 'N/A'}`;
+                        break;
+                    case 'TRANSFERENCIA_ENTRADA':
+                        details = `${log.details?.quantityReceivedOrUpdated || 'N/A'} unidades desde ${log.details?.fromSiteName || 'N/A'}`;
+                        break;
+                    case 'ITEM_ACTUALIZADO':
+                        details = `Campos: ${(log.details?.changedFields || []).join(', ')}`;
+                        break;
+                    case 'MANTENIMIENTO_REGISTRADO':
+                        details = `Tipo: ${log.details?.type || 'N/A'} - Costo: $${log.details?.cost || 0}`;
+                        break;
+                    default:
+                        details = log.details?.notes || 'Sin detalles';
+                }
+                
+                tableData.push([
+                    logDate,
+                    actionSummary,
+                    details,
+                    user,
+                    log.userCedula || 'N/A'
+                ]);
+            });
+            
+            // Create table - adjusted for landscape
+            doc.autoTable({
+                startY: 75,
+                head: [['Fecha/Hora', 'Acción', 'Detalles', 'Usuario', 'Cédula']],
+                body: tableData,
+                theme: 'grid',
+                headStyles: {
+                    fillColor: [6, 78, 59], // Nova green dark
+                    textColor: 255
+                },
+                alternateRowStyles: {
+                    fillColor: [243, 244, 246] // Nova gray light
+                },
+                styles: {
+                    fontSize: 9,
+                    cellPadding: 3
+                },
+                columnStyles: {
+                    0: { cellWidth: 40 },  // Date column
+                    1: { cellWidth: 45 },  // Action column
+                    2: { cellWidth: 110 }, // Details column - much wider now!
+                    3: { cellWidth: 50 },  // User column
+                    4: { cellWidth: 25 }   // Cedula column
+                },
+                margin: { left: 15, right: 15 }
+            });
+            
+            // Add footer note
+            const finalY = doc.lastAutoTable.finalY || 150;
+            doc.setFontSize(9);
+            doc.setTextColor(100, 100, 100);
+            doc.text('Este documento es un facsímil oficial del sistema SINU - Nova Urbano', 148, finalY + 10, { align: 'center' });
+        }
+        
+        // Save the PDF
+        const fileName = `Historial_${itemName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
+        doc.save(fileName);
+        
+    } catch (error) {
+        console.error('Error generating history PDF:', error);
+        alert(`Error al generar el PDF: ${error.message}`);
+    }
+}
 
     function formatLogDetails(log) {
         if (!log.details || typeof log.details !== 'object' || Object.keys(log.details).length === 0) {
@@ -1991,7 +2155,9 @@ auth.onAuthStateChanged(async user => {
     if (transferItemModal) transferItemModal.addEventListener('click', e => { if (e.target === transferItemModal) transferItemModal.classList.add('hidden'); });
     if (closeHistoryModalButton) closeHistoryModalButton.addEventListener('click', () => historyModal.classList.add('hidden'));
     if (historyModal) historyModal.addEventListener('click', e => { if (e.target === historyModal) historyModal.classList.add('hidden'); });
-
+    if (exportHistoryPdfBtn) {
+    exportHistoryPdfBtn.addEventListener('click', exportHistoryToPDF);
+}
     // Corrected Toggle Listener
     if (toggleZeroQtyCheckbox) {
         toggleZeroQtyCheckbox.addEventListener('change', () => {
