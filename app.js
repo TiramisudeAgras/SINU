@@ -13,10 +13,14 @@ document.addEventListener('DOMContentLoaded', () => {
         measurementId: "G-LZ4R7S6EPG"
     };
 
-    // Initialize Firebase
+    window.SINU_APP = {}; 
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
+
+    // Attach instances to the global object
+    window.SINU_APP.auth = auth;
+    window.SINU_APP.db = db;
     // -- END: Firebase Configuration --
 
     let currentUserRole = null;
@@ -82,6 +86,83 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- UI State Functions ---
+
+
+    // --- Global Search Functions ---
+    const searchInput = document.getElementById('global-search-input');
+    const searchResultsContainer = document.getElementById('global-search-results');
+
+    let allItemsCache = []; // Cache items to avoid re-fetching
+    let sitesCache = {}; // Cache site names
+
+    async function primeSearchCache() {
+        if (!auth.currentUser) return; // Don't run if not logged in
+        
+        try {
+            // Fetch all items once when the dashboard loads
+            const inventorySnapshot = await db.collection("inventoryItems").get();
+            allItemsCache = inventorySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+            // Fetch all sites once
+            const sitesSnapshot = await db.collection("constructionSites").get();
+            sitesCache = {}; // Clear previous cache
+            sitesSnapshot.forEach(doc => {
+                sitesCache[doc.id] = doc.data().name;
+            });
+            console.log("Search cache primed successfully.");
+        } catch(error) {
+            console.error("Error priming search cache:", error);
+            // Optionally display an error to the user in the search results area
+            if(searchResultsContainer) searchResultsContainer.innerHTML = `<p class="text-red-500">Error al inicializar la búsqueda.</p>`
+        }
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('keyup', (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            
+            if (query.length < 3) {
+                searchResultsContainer.innerHTML = '';
+                return;
+            }
+
+            const results = allItemsCache.filter(item => {
+                const nameMatch = item.itemName?.toLowerCase().includes(query);
+                const serialMatch = item.serialModel?.toLowerCase().includes(query);
+                const nuiMatch = item.nui?.toLowerCase().includes(query);
+                return nameMatch || serialMatch || nuiMatch;
+            });
+
+            displaySearchResults(results);
+        });
+    }
+
+    function displaySearchResults(results) {
+        if (!searchResultsContainer) return;
+        if (results.length === 0) {
+            searchResultsContainer.innerHTML = '<p class="text-nova-gray">No se encontraron resultados.</p>';
+            return;
+        }
+
+        let resultsHTML = '<ul class="space-y-2">';
+        results.forEach(item => {
+            const siteName = sitesCache[item.siteId] || 'Ubicación desconocida';
+            const escapedItemName = item.itemName?.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])) || 'Ítem sin nombre';
+
+            resultsHTML += `
+                <li class="p-3 bg-nova-gray-light rounded-md border border-gray-200">
+                    <p class="font-semibold text-nova-green-dark">${escapedItemName}</p>
+                    <p class="text-sm">NUI: ${item.nui || 'N/A'} | Serial: ${item.serialModel || 'N/A'}</p>
+                    <p class="text-sm font-bold">Ubicación: <span class="text-nova-green">${siteName}</span></p>
+                </li>
+            `;
+        });
+        resultsHTML += '</ul>';
+        searchResultsContainer.innerHTML = resultsHTML;
+    }
+
+// --- END Global Search Functions ---
+
     function showAuthSection() {
         authSection.classList.remove('hidden');
         dashboardSection.classList.add('hidden');
@@ -121,64 +202,101 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Authentication State Observer ---
-    auth.onAuthStateChanged(async user => {
-        if (user) {
-            currentUserRole = null;
-            try {
-                const userDocRef = db.collection("users").doc(user.uid);
-                const userDoc = await userDocRef.get();
-                if (userDoc.exists && userDoc.data().isApproved) {
-                    const userData = userDoc.data();
-                    currentUserRole = (userData.roles && userData.roles.length > 0) ? userData.roles[0] : 'espectador';
-                    const userNameDisplay = (userData.nombre && userData.apellidos) ?
-                        `${userData.nombre} ${userData.apellidos}` :
-                        user.email || 'Usuario';
-                    if (dashboardTitle) dashboardTitle.textContent = `Panel de ${userNameDisplay} (${currentUserRole})`;
-                    showDashboardSection();
-                    setupFilterButtons();
-                    loadConstructionSites();
-                } else {
-                    currentUserRole = null;
-                    showAuthSection();
-                    if (authTitle) authTitle.textContent = "Cuenta Pendiente de Aprobación";
-                    if (loginFormContainer) {
-                        loginFormContainer.innerHTML = `
-                            <p class="text-center text-nova-gray-dark mb-4">
-                                Su cuenta (${user.email || 'Nueva cuenta'}) ha sido registrada pero está pendiente de aprobación por un administrador.
-                                Por favor, intente iniciar sesión más tarde o contacte al administrador.
-                            </p>
-                            <button id="logout-pending-button" class="w-full mt-4 bg-nova-green hover:bg-nova-green-dark text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition-colors duration-150">
-                                Cerrar Sesión
-                            </button>
-                        `;
-                        if (registrationArea) registrationArea.innerHTML = '';
-                        const logoutPendingButton = document.getElementById('logout-pending-button');
-                        if (logoutPendingButton) {
-                            logoutPendingButton.addEventListener('click', () => auth.signOut());
-                        }
+    // --- Authentication State Observer ---
+auth.onAuthStateChanged(async user => {
+    if (user) {
+        currentUserRole = null; // Reset role on user change
+        try {
+            const userDocRef = db.collection("users").doc(user.uid);
+            const userDoc = await userDocRef.get();
+
+            if (userDoc.exists && userDoc.data().isApproved) {
+                const userData = userDoc.data();
+                // Correctly determine the user's primary role
+                currentUserRole = (userData.roles && userData.roles.length > 0) ? userData.roles[0] : 'espectador';
+
+                const userNameDisplay = (userData.nombre && userData.apellidos) ?
+                    `${userData.nombre} ${userData.apellidos}` :
+                    user.email || 'Usuario';
+
+                if (dashboardTitle) dashboardTitle.textContent = `Panel de ${userNameDisplay} (${currentUserRole})`;
+
+                // --- NEW LOGIC FOR ADMIN BUTTON ---
+                const adminButton = document.getElementById('admin-panel-button');
+                if (adminButton) { // Ensure the button exists before adding listeners
+                    // First, clone and replace to remove any old listeners
+                    const newAdminButton = adminButton.cloneNode(true);
+                    adminButton.parentNode.replaceChild(newAdminButton, adminButton);
+
+                    if (currentUserRole === 'admin') {
+                        newAdminButton.classList.remove('hidden');
+                        newAdminButton.addEventListener('click', () => {
+                            document.getElementById('dashboard-section').classList.add('hidden');
+                            document.getElementById('admin-section').classList.remove('hidden');
+                            
+                            // Call the function from admin.js to load users
+                            // Ensure admin.js and SINU_APP are loaded
+                            if (window.SINU_APP && typeof window.SINU_APP.loadAdminUsers === 'function') {
+                                window.SINU_APP.loadAdminUsers();
+                            } else {
+                                console.error("Admin functions not available.");
+                            }
+                        });
+                    } else {
+                        newAdminButton.classList.add('hidden');
                     }
                 }
-            } catch (error) {
-                console.error("Error fetching user approval status:", error);
+                // --- END OF NEW LOGIC ---
+
+                showDashboardSection();
+                setupFilterButtons();
+                loadConstructionSites();
+                primeSearchCache(); // Initialize the cache for global search
+
+            } else {
+                // This handles users who are not approved yet
                 currentUserRole = null;
                 showAuthSection();
-                if (authTitle) authTitle.textContent = "Error de Cuenta";
-                if (loginFormContainer) loginFormContainer.innerHTML = `<p class="text-red-500 text-center">Error al verificar el estado de su cuenta. Por favor, intente recargar la página o contacte soporte.</p>
-                    <button id="logout-error-button" class="w-full mt-4 bg-nova-green hover:bg-nova-green-dark text-white font-bold py-2 px-4 rounded">Cerrar Sesión</button>`;
-                if (registrationArea) registrationArea.innerHTML = '';
-                const logoutErrorButton = document.getElementById('logout-error-button');
-                if (logoutErrorButton) logoutErrorButton.addEventListener('click', () => auth.signOut());
+                if (authTitle) authTitle.textContent = "Cuenta Pendiente de Aprobación";
+                if (loginFormContainer) {
+                    loginFormContainer.innerHTML = `
+                        <p class="text-center text-nova-gray-dark mb-4">
+                            Su cuenta (${user.email || 'Nueva cuenta'}) ha sido registrada pero está pendiente de aprobación por un administrador.
+                            Por favor, intente iniciar sesión más tarde o contacte al administrador.
+                        </p>
+                        <button id="logout-pending-button" class="w-full mt-4 bg-nova-green hover:bg-nova-green-dark text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition-colors duration-150">
+                            Cerrar Sesión
+                        </button>
+                    `;
+                    if (registrationArea) registrationArea.innerHTML = '';
+                    const logoutPendingButton = document.getElementById('logout-pending-button');
+                    if (logoutPendingButton) {
+                        logoutPendingButton.addEventListener('click', () => auth.signOut());
+                    }
+                }
             }
-        } else {
+        } catch (error) {
+            console.error("Error fetching user approval status:", error);
             currentUserRole = null;
-            if (dashboardTitle) dashboardTitle.textContent = 'Panel Principal';
-            if (authTitle) authTitle.textContent = 'Bienvenido';
             showAuthSection();
-            if (sitesListContainer) sitesListContainer.innerHTML = '<p class="text-nova-gray">Cargando obras...</p>';
-            if (addSiteFormContainer) addSiteFormContainer.innerHTML = '';
-            renderLoginForm();
+            if (authTitle) authTitle.textContent = "Error de Cuenta";
+            if (loginFormContainer) loginFormContainer.innerHTML = `<p class="text-red-500 text-center">Error al verificar el estado de su cuenta. Por favor, intente recargar la página o contacte soporte.</p>
+                <button id="logout-error-button" class="w-full mt-4 bg-nova-green hover:bg-nova-green-dark text-white font-bold py-2 px-4 rounded">Cerrar Sesión</button>`;
+            if (registrationArea) registrationArea.innerHTML = '';
+            const logoutErrorButton = document.getElementById('logout-error-button');
+            if (logoutErrorButton) logoutErrorButton.addEventListener('click', () => auth.signOut());
         }
-    });
+    } else {
+        // This handles when no user is logged in
+        currentUserRole = null;
+        if (dashboardTitle) dashboardTitle.textContent = 'Panel Principal';
+        if (authTitle) authTitle.textContent = 'Bienvenido';
+        showAuthSection();
+        if (sitesListContainer) sitesListContainer.innerHTML = '<p class="text-nova-gray">Cargando obras...</p>';
+        if (addSiteFormContainer) addSiteFormContainer.innerHTML = '';
+        renderLoginForm();
+    }
+});
 
     // --- Logout Functionality ---
     if (logoutButton) {

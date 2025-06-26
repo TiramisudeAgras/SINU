@@ -76,23 +76,32 @@
             </section>
 
             <section id="dashboard-section" class="hidden">
+
                 <div class="flex justify-between items-center mb-6 p-4 bg-white rounded-lg shadow">
                     <h2 class="text-2xl font-semibold text-nova-green-dark" id="dashboard-title">Panel Principal</h2>
-                    <button id="logout-button" class="bg-nova-green-dark hover:bg-red-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition-colors duration-150">
-                        Cerrar Sesión
-                    </button>
+                    <div>
+                        <button id="admin-panel-button" class="hidden bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded mr-4">Admin Panel</button>
+                        <button id="logout-button" class="bg-nova-green-dark hover:bg-red-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition-colors duration-150">
+                            Cerrar Sesión
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mb-6 bg-white p-4 rounded-lg shadow">
+                    <h3 class="text-lg font-semibold text-nova-green-dark">Buscar Ítem en Todas las Ubicaciones</h3>
+                    <p class="text-sm text-nova-gray-dark">Busque por Nombre, Serial/Modelo, o NUI.</p>
+                    <div class="flex mt-2">
+                        <input type="text" id="global-search-input" placeholder="Ej: Taladro, TR-500, NUI-123ABC..." class="w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
+                    </div>
+                    <div id="global-search-results" class="mt-4"></div>
                 </div>
 
                 <div id="sites-section" class="bg-white p-6 rounded-lg shadow-lg mb-8">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-xl font-semibold text-nova-green-dark">Ubicaciones (Obras y Bodegas)</h3>
-                        <div id="add-site-button-container">
-                            </div>
+                        <div id="add-site-button-container"></div>
                     </div>
-                    
-                    <div id="add-site-form-container" class="mb-4">
-                        </div>
-
+                    <div id="add-site-form-container" class="mb-4"></div>
                     <div id="site-filter-container" class="flex space-x-2 mb-4 border-b pb-4">
                         <button id="filter-all" class="filter-btn active-filter-btn">Todos</button>
                         <button id="filter-obra" class="filter-btn">Obras</button>
@@ -106,33 +115,16 @@
                 </div>
 
                 <div id="inventory-section" class="hidden bg-white p-6 rounded-lg shadow-lg">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-xl font-semibold text-nova-green-dark">Inventario de: <span id="selected-site-name" class="text-nova-green"></span></h3>
-                        <button id="back-to-sites-button" class="bg-nova-gray hover:bg-nova-gray-dark text-white font-bold py-2 px-3 rounded text-sm transition-colors duration-150">
-                            ← Volver a Ubicaciones
-                        </button>
                     </div>
+            </section>
 
-                    <div class="flex items-center justify-between mb-4">
-                        <div id="add-item-form-container" class="mb-6">
-                            </div>
-
-                        <div id="export-button-container" class="mb-6">
-                            <button id="export-csv-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition-colors duration-150">
-                                Exportar a CSV
-                            </button>
-                        </div>
-                        <label for="toggle-zero-qty" class="flex items-center cursor-pointer">
-                            <span class="mr-3 text-sm font-medium text-nova-gray-dark">Mostrar ítems sin stock</span>
-                            <div class="relative">
-                                <input type="checkbox" id="toggle-zero-qty" class="sr-only peer">
-                                <div class="w-10 h-6 bg-gray-200 rounded-full peer peer-focus:ring-2 peer-focus:ring-nova-green-light dark:peer-focus:ring-nova-green peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-nova-green"></div>
-                            </div>
-                        </label>
-                    </div>
-
-                    <div id="inventory-list" class="mb-4">
-                        </div>
+            <section id="admin-section" class="hidden bg-white p-6 rounded-lg shadow-lg">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-semibold text-nova-green-dark">Panel de Administración de Usuarios</h2>
+                    <button id="back-to-dashboard-button" class="bg-nova-gray hover:bg-nova-gray-dark text-white font-bold py-2 px-3 rounded text-sm transition-colors duration-150">← Volver al Panel Principal</button>
+                </div>
+                <div id="user-list-container">
+                    <p>Cargando usuarios...</p>
                 </div>
             </section>
         </main>
@@ -316,5 +308,6 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
     <script src="app.js"></script>
+    <script src="admin.js"></script>
 </body>
 </html>
