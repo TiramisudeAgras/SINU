@@ -329,10 +329,117 @@
         </div>
     </div>
 
+    <!-- Maintenance Log Modal -->
+    <div id="maintenance-modal" class="fixed inset-0 bg-gray-800 bg-opacity-75 overflow-y-auto h-full w-full flex items-center justify-center hidden z-50 p-4">
+        <div class="relative mx-auto p-5 sm:p-6 border w-full max-w-4xl shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl leading-6 font-bold text-nova-green-dark" id="maintenance-modal-title">Bitácora de Mantenimiento</h3>
+                    <button id="export-maintenance-pdf" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded text-sm">
+                        📄 Exportar PDF
+                    </button>
+                </div>
+                <div class="mb-4">
+                    <button id="add-maintenance-entry-btn" class="bg-nova-green hover:bg-nova-green-dark text-white font-bold py-2 px-4 rounded text-sm">
+                        + Agregar Entrada de Mantenimiento
+                    </button>
+                </div>
+                <div class="mt-2 px-2 sm:px-4 py-3 max-h-[60vh] sm:max-h-[70vh] overflow-y-auto" id="maintenance-modal-content">
+                    <p class="text-nova-gray">Cargando bitácora...</p>
+                </div>
+                <div class="mt-4 px-2 sm:px-4 py-3 text-right">
+                    <button id="close-maintenance-modal-button"
+                            class="px-4 py-2 bg-nova-green hover:bg-nova-green-dark text-white text-base font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nova-green transition-colors duration-150">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Maintenance Entry Modal -->
+    <div id="add-maintenance-modal" class="fixed inset-0 bg-gray-800 bg-opacity-75 overflow-y-auto h-full w-full flex items-center justify-center hidden z-50 p-4">
+        <div class="relative mx-auto p-5 sm:p-6 border w-full max-w-lg shadow-lg rounded-md bg-white">
+            <form id="add-maintenance-form">
+                <h3 class="text-xl leading-6 font-bold text-nova-green-dark text-center mb-6">Agregar Entrada de Mantenimiento</h3>
+                
+                <input type="hidden" id="maintenance-item-id">
+                <input type="hidden" id="maintenance-item-name">
+                <input type="hidden" id="maintenance-site-id">
+                <input type="hidden" id="maintenance-site-name">
+                
+                <div class="space-y-4 max-h-[60vh] sm:max-h-[70vh] overflow-y-auto pr-2 mb-6">
+                    <div>
+                        <label for="maintenance-date" class="block text-sm font-medium text-nova-gray-dark">Fecha del Servicio</label>
+                        <input type="date" id="maintenance-date" name="maintenanceDate" required
+                               class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="maintenance-type" class="block text-sm font-medium text-nova-gray-dark">Tipo de Mantenimiento</label>
+                        <select id="maintenance-type" name="maintenanceType" required
+                                class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
+                            <option value="">Seleccione tipo...</option>
+                            <option value="preventivo">Preventivo</option>
+                            <option value="correctivo">Correctivo</option>
+                            <option value="inspeccion">Inspección</option>
+                            <option value="reparacion">Reparación Mayor</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="maintenance-description" class="block text-sm font-medium text-nova-gray-dark">Descripción del Trabajo</label>
+                        <textarea id="maintenance-description" name="maintenanceDescription" rows="3" required
+                                  class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"
+                                  placeholder="Ej: Cambio de aceite, revisión de frenos, etc."></textarea>
+                    </div>
+                    <div>
+                        <label for="maintenance-cost" class="block text-sm font-medium text-nova-gray-dark">Costo (COP)</label>
+                        <input type="number" id="maintenance-cost" name="maintenanceCost" min="0" step="1000"
+                               class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"
+                               placeholder="Ej: 500000">
+                    </div>
+                    <div>
+                        <label for="maintenance-technician" class="block text-sm font-medium text-nova-gray-dark">Técnico/Proveedor</label>
+                        <input type="text" id="maintenance-technician" name="maintenanceTechnician" required
+                               class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"
+                               placeholder="Ej: Juan Pérez - Taller XYZ">
+                    </div>
+                    <div>
+                        <label for="maintenance-hours" class="block text-sm font-medium text-nova-gray-dark">Horas de Operación/Kilometraje</label>
+                        <input type="text" id="maintenance-hours" name="maintenanceHours"
+                               class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"
+                               placeholder="Ej: 1,250 horas">
+                    </div>
+                    <div>
+                        <label for="next-maintenance-date" class="block text-sm font-medium text-nova-gray-dark">Próximo Mantenimiento</label>
+                        <input type="date" id="next-maintenance-date" name="nextMaintenanceDate"
+                               class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
+                    </div>
+                </div>
+
+                <p id="add-maintenance-error" class="my-2 text-center text-sm text-red-600"></p>
+                
+                <div class="flex justify-end space-x-3">
+                    <button type="button" id="cancel-add-maintenance-button"
+                            class="px-4 py-2 bg-gray-200 text-gray-700 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-colors duration-150">
+                        Cancelar
+                    </button>
+                    <button type="submit"
+                            class="px-4 py-2 bg-nova-green hover:bg-nova-green-dark text-white text-base font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nova-green transition-colors duration-150">
+                        Guardar Entrada
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 
     <script src="app.js"></script>
     <script src="admin.js"></script>
