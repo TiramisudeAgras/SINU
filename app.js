@@ -1931,44 +1931,47 @@ auth.onAuthStateChanged(async user => {
     const siteId = document.getElementById('maintenance-site-id').value;
     const siteName = document.getElementById('maintenance-site-name').value;
     
-    // Get the NUI from the item
-    const itemDoc = await db.collection("inventoryItems").doc(itemId).get();
-    if (!itemDoc.exists) {
-        alert('Error: Item no encontrado');
-        return;
-    }
-    const itemNUI = itemDoc.data().nui;
-    
-    const serviceDate = form.elements['maintenanceDate'].value;
-    const type = form.elements['maintenanceType'].value;
-    const description = form.elements['maintenanceDescription'].value.trim();
-    const costStr = form.elements['maintenanceCost'].value;
-    const technician = form.elements['maintenanceTechnician'].value.trim();
-    const hours = form.elements['maintenanceHours'].value.trim();
-    const nextServiceDate = form.elements['nextMaintenanceDate'].value;
-    
-    const errorElement = document.getElementById('add-maintenance-error');
-    if (errorElement) errorElement.textContent = '';
-    
-    if (!serviceDate || !type || !description || !technician) {
-        if (errorElement) errorElement.textContent = 'Por favor complete todos los campos obligatorios.';
-        return;
-    }
-    
-    const cost = costStr ? parseFloat(costStr) : 0;
-    
-    const user = auth.currentUser;
-    if (!user) {
-        if (errorElement) errorElement.textContent = 'Error de autenticación.';
-        return;
-    }
-    
     const submitButton = form.querySelector('button[type="submit"]');
     const originalButtonText = submitButton.textContent;
-    submitButton.disabled = true;
-    submitButton.textContent = 'Guardando...';
+    const errorElement = document.getElementById('add-maintenance-error');
+    
+    // Clear any previous errors
+    if (errorElement) errorElement.textContent = '';
     
     try {
+        // Get the NUI from the item
+        const itemDoc = await db.collection("inventoryItems").doc(itemId).get();
+        if (!itemDoc.exists) {
+            if (errorElement) errorElement.textContent = 'Error: Item no encontrado';
+            return;
+        }
+        const itemNUI = itemDoc.data().nui;
+        
+        const serviceDate = form.elements['maintenanceDate'].value;
+        const type = form.elements['maintenanceType'].value;
+        const description = form.elements['maintenanceDescription'].value.trim();
+        const costStr = form.elements['maintenanceCost'].value;
+        const technician = form.elements['maintenanceTechnician'].value.trim();
+        const hours = form.elements['maintenanceHours'].value.trim();
+        const nextServiceDate = form.elements['nextMaintenanceDate'].value;
+        
+        if (!serviceDate || !type || !description || !technician) {
+            if (errorElement) errorElement.textContent = 'Por favor complete todos los campos obligatorios.';
+            return;
+        }
+        
+        const cost = costStr ? parseFloat(costStr) : 0;
+        
+        const user = auth.currentUser;
+        if (!user) {
+            if (errorElement) errorElement.textContent = 'Error de autenticación.';
+            return;
+        }
+        
+        // Set loading state
+        submitButton.disabled = true;
+        submitButton.textContent = 'Guardando...';
+        
         let performingUserName = "Usuario Desconocido";
         let performingUserApellidos = "";
         let performingUserCedula = "";
@@ -2041,11 +2044,15 @@ auth.onAuthStateChanged(async user => {
         
         await batch.commit();
         
-        addMaintenanceModal.classList.add('hidden');
+        // SUCCESS: Close modal and refresh
+        if (addMaintenanceModal) addMaintenanceModal.classList.add('hidden');
         showMaintenanceLog(itemId, itemName, siteId, siteName); // Refresh the log
         
     } catch (error) {
+        console.error('Error saving maintenance record:', error);
         if (errorElement) errorElement.textContent = `Error al guardar: ${error.message}`;
+    } finally {
+        // ALWAYS reset the button state, regardless of success or error
         submitButton.disabled = false;
         submitButton.textContent = originalButtonText;
     }
