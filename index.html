@@ -150,6 +150,17 @@
                     <h2 class="text-2xl font-semibold text-nova-green-dark">Panel de Administración de Usuarios</h2>
                     <button id="back-to-dashboard-button" class="bg-nova-gray hover:bg-nova-gray-dark text-white font-bold py-2 px-3 rounded text-sm transition-colors duration-150">← Volver al Panel Principal</button>
                 </div>
+                
+                <!-- Add this legend -->
+                <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h3 class="text-sm font-semibold text-blue-800 mb-2">Roles del Sistema:</h3>
+                    <ul class="text-xs text-blue-700 space-y-1">
+                        <li><strong>Espectador:</strong> Solo puede ver el inventario (sin editar)</li>
+                        <li><strong>Oficina:</strong> Puede crear, editar, transferir items y gestionar mantenimiento</li>
+                        <li><strong>Admin:</strong> Todos los permisos + gestión de usuarios</li>
+                    </ul>
+                </div>
+                
                 <div id="user-list-container">
                     <p>Cargando usuarios...</p>
                 </div>

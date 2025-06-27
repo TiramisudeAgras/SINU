@@ -1693,7 +1693,8 @@ auth.onAuthStateChanged(async user => {
             const finalY = doc.lastAutoTable.finalY || 150;
             doc.setFontSize(9);
             doc.setTextColor(100, 100, 100);
-            doc.text('Este documento es un facsímil oficial del sistema SINU - Nova Urbano', 148, finalY + 10, { align: 'center' });
+            doc.text('Este documento es un registro oficial del sistema SINU - Nova Urbano', 148, finalY + 10, { align: 'center' });
+            doc.text(`Los registros de mantenimiento siguen el NUI y están disponibles en todas las ubicaciones`, 148, finalY + 17, { align: 'center' });
         }
         
         // Save the PDF
@@ -1761,36 +1762,86 @@ auth.onAuthStateChanged(async user => {
 
     // --- Maintenance Log Functions ---
     async function showMaintenanceLog(itemId, itemName, siteId, siteName) {
-        if (!maintenanceModal || !maintenanceModalTitle || !maintenanceModalContent) {
+    if (!maintenanceModal || !maintenanceModalTitle || !maintenanceModalContent) {
+        return;
+    }
+    
+    const escapedItemName = itemName ? itemName.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : 'Ítem Desconocido';
+    maintenanceModalTitle.textContent = `Bitácora de Mantenimiento: ${escapedItemName}`;
+    maintenanceModalContent.innerHTML = '<p class="text-nova-gray p-4">Cargando bitácora...</p>';
+    maintenanceModal.classList.remove('hidden');
+    
+    // Store data for adding new entries and PDF export
+    maintenanceModal.dataset.itemId = itemId;
+    maintenanceModal.dataset.itemName = itemName;
+    maintenanceModal.dataset.siteId = siteId;
+    maintenanceModal.dataset.siteName = siteName;
+    
+    try {
+        // Get item data to find NUI
+        const itemDoc = await db.collection("inventoryItems").doc(itemId).get();
+        if (!itemDoc.exists) {
+            maintenanceModalContent.innerHTML = '<p class="text-red-500 p-4">Error: Ítem no encontrado.</p>';
             return;
         }
         
-        const escapedItemName = itemName ? itemName.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : 'Ítem Desconocido';
-        maintenanceModalTitle.textContent = `Bitácora de Mantenimiento: ${escapedItemName}`;
-        maintenanceModalContent.innerHTML = '<p class="text-nova-gray p-4">Cargando bitácora...</p>';
-        maintenanceModal.classList.remove('hidden');
+        const itemData = itemDoc.data();
+        const itemNUI = itemData.nui;
         
-        // Store data for adding new entries and PDF export
-        maintenanceModal.dataset.itemId = itemId;
-        maintenanceModal.dataset.itemName = itemName;
-        maintenanceModal.dataset.siteId = siteId;
-        maintenanceModal.dataset.siteName = siteName;
+        // Get maintenance by NUI from global collection
+        const maintenanceSnapshot = await db.collection("maintenanceLogs")
+            .where("nui", "==", itemNUI)
+            .orderBy("serviceDate", "desc")
+            .get();
         
-        try {
-            const maintenanceSnapshot = await db.collection("inventoryItems").doc(itemId).collection("maintenance").orderBy("serviceDate", "desc").get();
+        let maintenanceHTML = '';
+        
+        // Add NUI display
+        maintenanceHTML += `
+            <div class="mb-4 p-2 bg-gray-100 rounded">
+                <p class="text-sm text-gray-700">
+                    <strong>NUI:</strong> ${itemNUI} - El historial sigue este identificador único
+                </p>
+            </div>
+        `;
+        
+        // Add warning note if quantity > 1
+        if (itemData.quantity > 1) {
+            maintenanceHTML += `
+                <div class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p class="text-sm text-yellow-800">
+                        ⚠️ <strong>Nota:</strong> Este ítem tiene cantidad ${itemData.quantity}. 
+                        La bitácora aplica al grupo completo.
+                    </p>
+                </div>
+            `;
+        }
+        
+        if (maintenanceSnapshot.empty) {
+            maintenanceHTML += '<p class="text-nova-gray p-4">No hay entradas de mantenimiento para este ítem.</p>';
+        } else {
+            let totalCost = 0;
             
-            if (maintenanceSnapshot.empty) {
-                maintenanceModalContent.innerHTML = '<p class="text-nova-gray p-4">No hay entradas de mantenimiento para este ítem.</p>';
-                return;
+            // Calculate total cost
+            maintenanceSnapshot.forEach(doc => {
+                const entry = doc.data();
+                totalCost += entry.cost || 0;
+            });
+            
+            // Show total cost
+            if (totalCost > 0) {
+                maintenanceHTML += `
+                    <div class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <p class="text-lg font-bold text-yellow-800">Costo Total de Mantenimiento: $${totalCost.toLocaleString('es-CO')}</p>
+                    </div>
+                `;
             }
             
-            let maintenanceHTML = '<ul class="space-y-4">';
-            let totalCost = 0;
+            maintenanceHTML += '<ul class="space-y-4">';
             
             maintenanceSnapshot.forEach(doc => {
                 const entry = doc.data();
                 const cost = entry.cost || 0;
-                totalCost += cost;
                 
                 const serviceDate = entry.serviceDate ? new Date(entry.serviceDate.seconds * 1000).toLocaleDateString('es-CO') : 'Fecha desconocida';
                 const nextServiceDate = entry.nextServiceDate ? new Date(entry.nextServiceDate.seconds * 1000).toLocaleDateString('es-CO') : 'No programado';
@@ -1811,6 +1862,7 @@ auth.onAuthStateChanged(async user => {
                             <div>
                                 <p class="font-semibold text-nova-green-dark text-lg">${typeLabel}</p>
                                 <p class="text-sm text-gray-600">Fecha: ${serviceDate}</p>
+                                <p class="text-xs text-gray-500">Realizado en: ${entry.siteName || 'Ubicación no especificada'}</p>
                             </div>
                             <div class="text-right">
                                 ${cost > 0 ? `<p class="font-bold text-lg ${typeColor}">$${cost.toLocaleString('es-CO')}</p>` : ''}
@@ -1828,22 +1880,24 @@ auth.onAuthStateChanged(async user => {
             });
             
             maintenanceHTML += '</ul>';
-            
-            // Add total cost summary
-            if (totalCost > 0) {
-                maintenanceHTML = `
-                    <div class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                        <p class="text-lg font-bold text-yellow-800">Costo Total de Mantenimiento: $${totalCost.toLocaleString('es-CO')}</p>
-                    </div>
-                ` + maintenanceHTML;
-            }
-            
-            maintenanceModalContent.innerHTML = maintenanceHTML;
-            
-        } catch (error) {
-            maintenanceModalContent.innerHTML = `<p class="text-red-500 p-4">Error al cargar la bitácora: ${error.message}</p>`;
         }
+        
+        // Success message
+        maintenanceHTML += `
+            <div class="mt-6 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p class="text-xs text-green-800">
+                    ✅ <strong>Transferencias sin problema:</strong> La bitácora sigue al NUI ${itemNUI}, 
+                    así que el historial completo está disponible sin importar dónde esté el equipo.
+                </p>
+            </div>
+        `;
+        
+        maintenanceModalContent.innerHTML = maintenanceHTML;
+        
+    } catch (error) {
+        maintenanceModalContent.innerHTML = `<p class="text-red-500 p-4">Error al cargar la bitácora: ${error.message}</p>`;
     }
+}
     
     function showAddMaintenanceForm() {
         const itemId = maintenanceModal.dataset.itemId;
@@ -1868,256 +1922,291 @@ auth.onAuthStateChanged(async user => {
     }
     
     async function handleAddMaintenanceSubmit(event) {
-        event.preventDefault();
-        if (currentUserRole !== 'oficina') return;
+    event.preventDefault();
+    if (currentUserRole !== 'oficina') return;
+    
+    const form = event.target;
+    const itemId = document.getElementById('maintenance-item-id').value;
+    const itemName = document.getElementById('maintenance-item-name').value;
+    const siteId = document.getElementById('maintenance-site-id').value;
+    const siteName = document.getElementById('maintenance-site-name').value;
+    
+    // Get the NUI from the item
+    const itemDoc = await db.collection("inventoryItems").doc(itemId).get();
+    if (!itemDoc.exists) {
+        alert('Error: Item no encontrado');
+        return;
+    }
+    const itemNUI = itemDoc.data().nui;
+    
+    const serviceDate = form.elements['maintenanceDate'].value;
+    const type = form.elements['maintenanceType'].value;
+    const description = form.elements['maintenanceDescription'].value.trim();
+    const costStr = form.elements['maintenanceCost'].value;
+    const technician = form.elements['maintenanceTechnician'].value.trim();
+    const hours = form.elements['maintenanceHours'].value.trim();
+    const nextServiceDate = form.elements['nextMaintenanceDate'].value;
+    
+    const errorElement = document.getElementById('add-maintenance-error');
+    if (errorElement) errorElement.textContent = '';
+    
+    if (!serviceDate || !type || !description || !technician) {
+        if (errorElement) errorElement.textContent = 'Por favor complete todos los campos obligatorios.';
+        return;
+    }
+    
+    const cost = costStr ? parseFloat(costStr) : 0;
+    
+    const user = auth.currentUser;
+    if (!user) {
+        if (errorElement) errorElement.textContent = 'Error de autenticación.';
+        return;
+    }
+    
+    const submitButton = form.querySelector('button[type="submit"]');
+    const originalButtonText = submitButton.textContent;
+    submitButton.disabled = true;
+    submitButton.textContent = 'Guardando...';
+    
+    try {
+        let performingUserName = "Usuario Desconocido";
+        let performingUserApellidos = "";
+        let performingUserCedula = "";
         
-        const form = event.target;
-        const itemId = document.getElementById('maintenance-item-id').value;
-        const itemName = document.getElementById('maintenance-item-name').value;
-        const siteId = document.getElementById('maintenance-site-id').value;
-        const siteName = document.getElementById('maintenance-site-name').value;
-        
-        const serviceDate = form.elements['maintenanceDate'].value;
-        const type = form.elements['maintenanceType'].value;
-        const description = form.elements['maintenanceDescription'].value.trim();
-        const costStr = form.elements['maintenanceCost'].value;
-        const technician = form.elements['maintenanceTechnician'].value.trim();
-        const hours = form.elements['maintenanceHours'].value.trim();
-        const nextServiceDate = form.elements['nextMaintenanceDate'].value;
-        
-        const errorElement = document.getElementById('add-maintenance-error');
-        if (errorElement) errorElement.textContent = '';
-        
-        if (!serviceDate || !type || !description || !technician) {
-            if (errorElement) errorElement.textContent = 'Por favor complete todos los campos obligatorios.';
-            return;
+        const userProfileSnap = await db.collection("users").doc(user.uid).get();
+        if (userProfileSnap.exists) {
+            const userData = userProfileSnap.data();
+            performingUserName = userData.nombre || performingUserName;
+            performingUserApellidos = userData.apellidos || "";
+            performingUserCedula = userData.cedula || "";
         }
         
-        const cost = costStr ? parseFloat(costStr) : 0;
+        const timestamp = firebase.firestore.FieldValue.serverTimestamp();
         
-        const user = auth.currentUser;
-        if (!user) {
-            if (errorElement) errorElement.textContent = 'Error de autenticación.';
-            return;
+        // Create maintenance entry in GLOBAL collection
+        const maintenanceData = {
+            nui: itemNUI, // This is the KEY - maintenance follows NUI
+            itemName: itemName, // For reference
+            serviceDate: firebase.firestore.Timestamp.fromDate(new Date(serviceDate)),
+            type: type,
+            description: description,
+            cost: cost,
+            technician: technician,
+            hours: hours,
+            siteId: siteId, // Where maintenance was performed
+            siteName: siteName,
+            userId: user.uid,
+            userName: performingUserName,
+            userApellidos: performingUserApellidos,
+            userCedula: performingUserCedula,
+            createdAt: timestamp
+        };
+        
+        if (nextServiceDate) {
+            maintenanceData.nextServiceDate = firebase.firestore.Timestamp.fromDate(new Date(nextServiceDate));
         }
         
-        const submitButton = form.querySelector('button[type="submit"]');
-        const originalButtonText = submitButton.textContent;
-        submitButton.disabled = true;
-        submitButton.textContent = 'Guardando...';
+        // Add to GLOBAL maintenance collection
+        await db.collection("maintenanceLogs").add(maintenanceData);
         
-        try {
-            let performingUserName = "Usuario Desconocido";
-            let performingUserApellidos = "";
-            let performingUserCedula = "";
-            
-            const userProfileSnap = await db.collection("users").doc(user.uid).get();
-            if (userProfileSnap.exists) {
-                const userData = userProfileSnap.data();
-                performingUserName = userData.nombre || performingUserName;
-                performingUserApellidos = userData.apellidos || "";
-                performingUserCedula = userData.cedula || "";
-            }
-            
-            const timestamp = firebase.firestore.FieldValue.serverTimestamp();
-            
-            // Create maintenance entry
-            const maintenanceData = {
-                serviceDate: firebase.firestore.Timestamp.fromDate(new Date(serviceDate)),
+        // Still add to history for tracking
+        await db.collection("inventoryItems").doc(itemId).collection("history").add({
+            timestamp: timestamp,
+            userId: user.uid,
+            userName: performingUserName,
+            userApellidos: performingUserApellidos,
+            userCedula: performingUserCedula,
+            nui: itemNUI,
+            action: "MANTENIMIENTO_REGISTRADO",
+            details: {
                 type: type,
-                description: description,
+                serviceDate: serviceDate,
                 cost: cost,
                 technician: technician,
-                hours: hours,
-                userId: user.uid,
-                userName: performingUserName,
-                userApellidos: performingUserApellidos,
-                userCedula: performingUserCedula,
-                createdAt: timestamp
-            };
-            
-            if (nextServiceDate) {
-                maintenanceData.nextServiceDate = firebase.firestore.Timestamp.fromDate(new Date(nextServiceDate));
+                notes: `Mantenimiento ${type} realizado. ${description}`
             }
-            
-            // Add to maintenance subcollection
-            await db.collection("inventoryItems").doc(itemId).collection("maintenance").add(maintenanceData);
-            
-            // Also add to history for tracking
-            await db.collection("inventoryItems").doc(itemId).collection("history").add({
-                timestamp: timestamp,
-                userId: user.uid,
-                userName: performingUserName,
-                userApellidos: performingUserApellidos,
-                userCedula: performingUserCedula,
-                action: "MANTENIMIENTO_REGISTRADO",
-                details: {
-                    type: type,
-                    serviceDate: serviceDate,
-                    cost: cost,
-                    technician: technician,
-                    notes: `Mantenimiento ${type} realizado. ${description}`
-                }
-            });
-            
-            // Update the item to show last maintenance date
-            await db.collection("inventoryItems").doc(itemId).update({
+        });
+        
+        // Update ALL items with this NUI across ALL sites
+        const allItemsWithNUI = await db.collection("inventoryItems").where("nui", "==", itemNUI).get();
+        const batch = db.batch();
+        
+        allItemsWithNUI.forEach(doc => {
+            batch.update(doc.ref, {
                 lastMaintenanceDate: firebase.firestore.Timestamp.fromDate(new Date(serviceDate)),
                 nextMaintenanceDate: nextServiceDate ? firebase.firestore.Timestamp.fromDate(new Date(nextServiceDate)) : null,
                 lastUpdatedAt: timestamp
             });
-            
-            addMaintenanceModal.classList.add('hidden');
-            showMaintenanceLog(itemId, itemName, siteId, siteName); // Refresh the log
-            
-        } catch (error) {
-            if (errorElement) errorElement.textContent = `Error al guardar: ${error.message}`;
-            submitButton.disabled = false;
-            submitButton.textContent = originalButtonText;
-        }
+        });
+        
+        await batch.commit();
+        
+        addMaintenanceModal.classList.add('hidden');
+        showMaintenanceLog(itemId, itemName, siteId, siteName); // Refresh the log
+        
+    } catch (error) {
+        if (errorElement) errorElement.textContent = `Error al guardar: ${error.message}`;
+        submitButton.disabled = false;
+        submitButton.textContent = originalButtonText;
     }
+}
     
     async function exportMaintenanceToPDF() {
-        const itemId = maintenanceModal.dataset.itemId;
-        const itemName = maintenanceModal.dataset.itemName;
-        const siteId = maintenanceModal.dataset.siteId;
-        const siteName = maintenanceModal.dataset.siteName;
+    const itemId = maintenanceModal.dataset.itemId;
+    const itemName = maintenanceModal.dataset.itemName;
+    const siteId = maintenanceModal.dataset.siteId;
+    const siteName = maintenanceModal.dataset.siteName;
+    
+    if (!itemId || !window.jspdf) {
+        alert('Error: No se puede generar el PDF.');
+        return;
+    }
+    
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
         
-        if (!itemId || !window.jspdf) {
-            alert('Error: No se puede generar el PDF.');
+        // Header
+        doc.setFontSize(20);
+        doc.setTextColor(6, 78, 59); // Nova green dark
+        doc.text('NOVA URBANO SAS', 105, 20, { align: 'center' });
+        
+        doc.setFontSize(16);
+        doc.text('Bitácora de Mantenimiento', 105, 30, { align: 'center' });
+        
+        // Get item details including NUI
+        const itemDoc = await db.collection("inventoryItems").doc(itemId).get();
+        if (!itemDoc.exists) {
+            alert('Error: Ítem no encontrado');
             return;
         }
         
-        try {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            
-            // Header
-            doc.setFontSize(20);
-            doc.setTextColor(6, 78, 59); // Nova green dark
-            doc.text('NOVA URBANO SAS', 105, 20, { align: 'center' });
-            
-            doc.setFontSize(16);
-            doc.text('Bitácora de Mantenimiento', 105, 30, { align: 'center' });
-            
-            // Equipment info
-            doc.setFontSize(12);
-            doc.setTextColor(0, 0, 0);
-            doc.text(`Equipo: ${itemName}`, 20, 45);
-            doc.text(`Ubicación: ${siteName}`, 20, 52);
-            
-            // Get the item details
-            const itemDoc = await db.collection("inventoryItems").doc(itemId).get();
-            if (itemDoc.exists) {
-                const itemData = itemDoc.data();
-                if (itemData.serialModel) {
-                    doc.text(`Serial/Modelo: ${itemData.serialModel}`, 20, 59);
-                }
-            }
-            
-            // Report metadata
-            doc.setFontSize(10);
-            doc.setTextColor(100, 100, 100);
-            const reportDate = new Date().toLocaleString('es-CO');
-            doc.text(`Fecha del reporte: ${reportDate}`, 20, 66);
-            
-            const currentUser = auth.currentUser;
-            let generatedBy = 'Usuario';
-            if (currentUser) {
-                const userDoc = await db.collection("users").doc(currentUser.uid).get();
-                if (userDoc.exists) {
-                    const userData = userDoc.data();
-                    generatedBy = `${userData.nombre || ''} ${userData.apellidos || ''}`.trim() || currentUser.email;
-                }
-            }
-            doc.text(`Generado por: ${generatedBy}`, 20, 73);
-            
-            // Get maintenance entries
-            const maintenanceSnapshot = await db.collection("inventoryItems").doc(itemId).collection("maintenance").orderBy("serviceDate", "desc").get();
-            
-            if (maintenanceSnapshot.empty) {
-                doc.text('No hay entradas de mantenimiento registradas.', 20, 90);
-            } else {
-                // Prepare table data
-                const tableData = [];
-                let totalCost = 0;
-                
-                maintenanceSnapshot.forEach(doc => {
-                    const entry = doc.data();
-                    const cost = entry.cost || 0;
-                    totalCost += cost;
-                    
-                    const serviceDate = entry.serviceDate ? new Date(entry.serviceDate.seconds * 1000).toLocaleDateString('es-CO') : 'N/A';
-                    const typeLabels = {
-                        'preventivo': 'Preventivo',
-                        'correctivo': 'Correctivo',
-                        'inspeccion': 'Inspección',
-                        'reparacion': 'Reparación Mayor'
-                    };
-                    
-                    tableData.push([
-                        serviceDate,
-                        typeLabels[entry.type] || entry.type || 'N/A',
-                        entry.description || 'N/A',
-                        entry.technician || 'N/A',
-                        cost > 0 ? `$${cost.toLocaleString('es-CO')}` : '-',
-                        entry.hours || '-'
-                    ]);
-                });
-                
-                // Create table
-                doc.autoTable({
-                    startY: 85,
-                    head: [['Fecha', 'Tipo', 'Descripción', 'Técnico', 'Costo', 'Horas/Km']],
-                    body: tableData,
-                    theme: 'grid',
-                    headStyles: {
-                        fillColor: [6, 78, 59], // Nova green dark
-                        textColor: 255
-                    },
-                    alternateRowStyles: {
-                        fillColor: [243, 244, 246] // Nova gray light
-                    },
-                    styles: {
-                        fontSize: 9,
-                        cellPadding: 3
-                    },
-                    columnStyles: {
-                        2: { cellWidth: 60 }, // Description column wider
-                        4: { halign: 'right' }, // Cost column right-aligned
-                        5: { halign: 'center' } // Hours column centered
-                    }
-                });
-                
-                // Add total cost
-                const finalY = doc.lastAutoTable.finalY;
-                doc.setFontSize(12);
-                doc.setFont(undefined, 'bold');
-                doc.text(`Costo Total de Mantenimiento: $${totalCost.toLocaleString('es-CO')}`, 20, finalY + 10);
-                
-                // Add signature lines
-                doc.setFont(undefined, 'normal');
-                doc.setFontSize(10);
-                const signatureY = finalY + 30;
-                
-                // Supervisor signature
-                doc.line(20, signatureY, 80, signatureY);
-                doc.text('Supervisor de Mantenimiento', 50, signatureY + 5, { align: 'center' });
-                
-                // Manager signature
-                doc.line(130, signatureY, 190, signatureY);
-                doc.text('Gerente de Operaciones', 160, signatureY + 5, { align: 'center' });
-            }
-            
-            // Save the PDF
-            const fileName = `Bitacora_${itemName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
-            doc.save(fileName);
-            
-        } catch (error) {
-            console.error('Error generating PDF:', error);
-            alert(`Error al generar el PDF: ${error.message}`);
+        const itemData = itemDoc.data();
+        const itemNUI = itemData.nui;
+        
+        // Equipment info
+        doc.setFontSize(12);
+        doc.setTextColor(0, 0, 0);
+        doc.text(`Equipo: ${itemName}`, 20, 45);
+        doc.text(`NUI: ${itemNUI}`, 20, 52);
+        doc.text(`Ubicación Actual: ${siteName}`, 20, 59);
+        
+        if (itemData.serialModel) {
+            doc.text(`Serial/Modelo: ${itemData.serialModel}`, 20, 66);
         }
+        
+        // Report metadata
+        doc.setFontSize(10);
+        doc.setTextColor(100, 100, 100);
+        const reportDate = new Date().toLocaleString('es-CO');
+        doc.text(`Fecha del reporte: ${reportDate}`, 20, 73);
+        
+        const currentUser = auth.currentUser;
+        let generatedBy = 'Usuario';
+        if (currentUser) {
+            const userDoc = await db.collection("users").doc(currentUser.uid).get();
+            if (userDoc.exists) {
+                const userData = userDoc.data();
+                generatedBy = `${userData.nombre || ''} ${userData.apellidos || ''}`.trim() || currentUser.email;
+            }
+        }
+        doc.text(`Generado por: ${generatedBy}`, 20, 80);
+        
+        // Get maintenance entries by NUI
+        const maintenanceSnapshot = await db.collection("maintenanceLogs")
+            .where("nui", "==", itemNUI)
+            .orderBy("serviceDate", "desc")
+            .get();
+        
+        if (maintenanceSnapshot.empty) {
+            doc.text('No hay entradas de mantenimiento registradas.', 20, 90);
+        } else {
+            // Prepare table data
+            const tableData = [];
+            let totalCost = 0;
+            
+            maintenanceSnapshot.forEach(doc => {
+                const entry = doc.data();
+                const cost = entry.cost || 0;
+                totalCost += cost;
+                
+                const serviceDate = entry.serviceDate ? new Date(entry.serviceDate.seconds * 1000).toLocaleDateString('es-CO') : 'N/A';
+                const typeLabels = {
+                    'preventivo': 'Preventivo',
+                    'correctivo': 'Correctivo',
+                    'inspeccion': 'Inspección',
+                    'reparacion': 'Reparación Mayor'
+                };
+                
+                tableData.push([
+                    serviceDate,
+                    typeLabels[entry.type] || entry.type || 'N/A',
+                    entry.description || 'N/A',
+                    entry.technician || 'N/A',
+                    entry.siteName || 'N/A', // Where maintenance was done
+                    cost > 0 ? `$${cost.toLocaleString('es-CO')}` : '-',
+                    entry.hours || '-'
+                ]);
+            });
+            
+            // Create table
+            doc.autoTable({
+                startY: 85,
+                head: [['Fecha', 'Tipo', 'Descripción', 'Técnico', 'Ubicación', 'Costo', 'Horas/Km']],
+                body: tableData,
+                theme: 'grid',
+                headStyles: {
+                    fillColor: [6, 78, 59], // Nova green dark
+                    textColor: 255
+                },
+                alternateRowStyles: {
+                    fillColor: [243, 244, 246] // Nova gray light
+                },
+                styles: {
+                    fontSize: 8,
+                    cellPadding: 2
+                },
+                columnStyles: {
+                    2: { cellWidth: 50 }, // Description column wider
+                    5: { halign: 'right' }, // Cost column right-aligned
+                    6: { halign: 'center' } // Hours column centered
+                }
+            });
+            
+            // Add total cost
+            const finalY = doc.lastAutoTable.finalY;
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            doc.text(`Costo Total de Mantenimiento: $${totalCost.toLocaleString('es-CO')}`, 20, finalY + 10);
+            
+            // Add NUI note
+            doc.setFont(undefined, 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(100, 100, 100);
+            doc.text(`Este historial corresponde al equipo con NUI ${itemNUI} en todas sus ubicaciones`, 105, finalY + 20, { align: 'center' });
+            
+            // Add signature lines
+            doc.setFontSize(10);
+            const signatureY = finalY + 35;
+            
+            // Supervisor signature
+            doc.line(20, signatureY, 80, signatureY);
+            doc.text('Supervisor de Mantenimiento', 50, signatureY + 5, { align: 'center' });
+            
+            // Manager signature
+            doc.line(130, signatureY, 190, signatureY);
+            doc.text('Gerente de Operaciones', 160, signatureY + 5, { align: 'center' });
+        }
+        
+        // Save the PDF
+        const fileName = `Bitacora_${itemNUI}_${itemName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
+        doc.save(fileName);
+        
+    } catch (error) {
+        console.error('Error generating PDF:', error);
+        alert(`Error al generar el PDF: ${error.message}`);
     }
+}
     
     // --- Event Listeners ---
     if (editItemForm) editItemForm.addEventListener('submit', (event) => {
