@@ -2,7 +2,9 @@
 
 document.addEventListener('DOMContentLoaded', () => {
 
-    // -- START: Firebase Configuration --
+     // Initialize the global object first
+    window.SINU_APP = window.SINU_APP || {};
+    
     const firebaseConfig = {
         apiKey: "AIzaSyDydDrSWx8eS3MgLfdpzbWWxTrxBaUINvU",
         authDomain: "sinu-nova-urbano.firebaseapp.com",
@@ -13,10 +15,13 @@ document.addEventListener('DOMContentLoaded', () => {
         measurementId: "G-LZ4R7S6EPG"
     };
 
-    // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
+
+    // Attach instances to the global object
+    window.SINU_APP.auth = auth;
+    window.SINU_APP.db = db;
     // -- END: Firebase Configuration --
 
     let currentUserRole = null;
@@ -75,6 +80,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const transferCurrentQuantityDisplay = document.getElementById('transfer-current-quantity-display');
     const destinationSiteIdSelect = document.getElementById('destination-site-id');
     const toggleZeroQtyCheckbox = document.getElementById('toggle-zero-qty');
+    // Maintenance modal elements
+    const maintenanceModal = document.getElementById('maintenance-modal');
+    const maintenanceModalTitle = document.getElementById('maintenance-modal-title');
+    const maintenanceModalContent = document.getElementById('maintenance-modal-content');
+    const closeMaintenanceModalButton = document.getElementById('close-maintenance-modal-button');
+    const addMaintenanceEntryBtn = document.getElementById('add-maintenance-entry-btn');
+    const exportMaintenancePdfBtn = document.getElementById('export-maintenance-pdf');
+    const addMaintenanceModal = document.getElementById('add-maintenance-modal');
+    const addMaintenanceForm = document.getElementById('add-maintenance-form');
+    const cancelAddMaintenanceButton = document.getElementById('cancel-add-maintenance-button');
+    // Export History
+    const exportHistoryPdfBtn = document.getElementById('export-history-pdf');
 
     // --- Initial Page Setup ---
     if (currentYearSpan) {
@@ -82,6 +99,83 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- UI State Functions ---
+
+
+    // --- Global Search Functions ---
+    const searchInput = document.getElementById('global-search-input');
+    const searchResultsContainer = document.getElementById('global-search-results');
+
+    let allItemsCache = []; // Cache items to avoid re-fetching
+    let sitesCache = {}; // Cache site names
+
+    async function primeSearchCache() {
+        if (!auth.currentUser) return; // Don't run if not logged in
+        
+        try {
+            // Fetch all items once when the dashboard loads
+            const inventorySnapshot = await db.collection("inventoryItems").get();
+            allItemsCache = inventorySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+            // Fetch all sites once
+            const sitesSnapshot = await db.collection("constructionSites").get();
+            sitesCache = {}; // Clear previous cache
+            sitesSnapshot.forEach(doc => {
+                sitesCache[doc.id] = doc.data().name;
+            });
+            console.log("Search cache primed successfully.");
+        } catch(error) {
+            console.error("Error priming search cache:", error);
+            // Optionally display an error to the user in the search results area
+            if(searchResultsContainer) searchResultsContainer.innerHTML = `<p class="text-red-500">Error al inicializar la búsqueda.</p>`
+        }
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('keyup', (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            
+            if (query.length < 3) {
+                searchResultsContainer.innerHTML = '';
+                return;
+            }
+
+            const results = allItemsCache.filter(item => {
+                const nameMatch = item.itemName?.toLowerCase().includes(query);
+                const serialMatch = item.serialModel?.toLowerCase().includes(query);
+                const nuiMatch = item.nui?.toLowerCase().includes(query);
+                return nameMatch || serialMatch || nuiMatch;
+            });
+
+            displaySearchResults(results);
+        });
+    }
+
+    function displaySearchResults(results) {
+        if (!searchResultsContainer) return;
+        if (results.length === 0) {
+            searchResultsContainer.innerHTML = '<p class="text-nova-gray">No se encontraron resultados.</p>';
+            return;
+        }
+
+        let resultsHTML = '<ul class="space-y-2">';
+        results.forEach(item => {
+            const siteName = sitesCache[item.siteId] || 'Ubicación desconocida';
+            const escapedItemName = item.itemName?.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])) || 'Ítem sin nombre';
+
+            resultsHTML += `
+                <li class="p-3 bg-nova-gray-light rounded-md border border-gray-200">
+                    <p class="font-semibold text-nova-green-dark">${escapedItemName}</p>
+                    <p class="text-sm">NUI: ${item.nui || 'N/A'} | Serial: ${item.serialModel || 'N/A'}</p>
+                    <p class="text-sm font-bold">Ubicación: <span class="text-nova-green">${siteName}</span></p>
+                </li>
+            `;
+        });
+        resultsHTML += '</ul>';
+        searchResultsContainer.innerHTML = resultsHTML;
+    }
+
+// --- END Global Search Functions ---
+
     function showAuthSection() {
         authSection.classList.remove('hidden');
         dashboardSection.classList.add('hidden');
@@ -121,64 +215,101 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Authentication State Observer ---
-    auth.onAuthStateChanged(async user => {
-        if (user) {
-            currentUserRole = null;
-            try {
-                const userDocRef = db.collection("users").doc(user.uid);
-                const userDoc = await userDocRef.get();
-                if (userDoc.exists && userDoc.data().isApproved) {
-                    const userData = userDoc.data();
-                    currentUserRole = (userData.roles && userData.roles.length > 0) ? userData.roles[0] : 'espectador';
-                    const userNameDisplay = (userData.nombre && userData.apellidos) ?
-                        `${userData.nombre} ${userData.apellidos}` :
-                        user.email || 'Usuario';
-                    if (dashboardTitle) dashboardTitle.textContent = `Panel de ${userNameDisplay} (${currentUserRole})`;
-                    showDashboardSection();
-                    setupFilterButtons();
-                    loadConstructionSites();
-                } else {
-                    currentUserRole = null;
-                    showAuthSection();
-                    if (authTitle) authTitle.textContent = "Cuenta Pendiente de Aprobación";
-                    if (loginFormContainer) {
-                        loginFormContainer.innerHTML = `
-                            <p class="text-center text-nova-gray-dark mb-4">
-                                Su cuenta (${user.email || 'Nueva cuenta'}) ha sido registrada pero está pendiente de aprobación por un administrador.
-                                Por favor, intente iniciar sesión más tarde o contacte al administrador.
-                            </p>
-                            <button id="logout-pending-button" class="w-full mt-4 bg-nova-green hover:bg-nova-green-dark text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition-colors duration-150">
-                                Cerrar Sesión
-                            </button>
-                        `;
-                        if (registrationArea) registrationArea.innerHTML = '';
-                        const logoutPendingButton = document.getElementById('logout-pending-button');
-                        if (logoutPendingButton) {
-                            logoutPendingButton.addEventListener('click', () => auth.signOut());
-                        }
+    // --- Authentication State Observer ---
+auth.onAuthStateChanged(async user => {
+    if (user) {
+        currentUserRole = null; // Reset role on user change
+        try {
+            const userDocRef = db.collection("users").doc(user.uid);
+            const userDoc = await userDocRef.get();
+
+            if (userDoc.exists && userDoc.data().isApproved) {
+                const userData = userDoc.data();
+                // Correctly determine the user's primary role
+                currentUserRole = (userData.roles && userData.roles.length > 0) ? userData.roles[0] : 'espectador';
+
+                const userNameDisplay = (userData.nombre && userData.apellidos) ?
+                    `${userData.nombre} ${userData.apellidos}` :
+                    user.email || 'Usuario';
+
+                if (dashboardTitle) dashboardTitle.textContent = `Panel de ${userNameDisplay} (${currentUserRole})`;
+
+                // --- NEW LOGIC FOR ADMIN BUTTON ---
+                const adminButton = document.getElementById('admin-panel-button');
+                if (adminButton) { // Ensure the button exists before adding listeners
+                    // First, clone and replace to remove any old listeners
+                    const newAdminButton = adminButton.cloneNode(true);
+                    adminButton.parentNode.replaceChild(newAdminButton, adminButton);
+
+                    if (currentUserRole === 'admin') {
+                        newAdminButton.classList.remove('hidden');
+                        newAdminButton.addEventListener('click', () => {
+                            document.getElementById('dashboard-section').classList.add('hidden');
+                            document.getElementById('admin-section').classList.remove('hidden');
+                            
+                            // Call the function from admin.js to load users
+                            // Ensure admin.js and SINU_APP are loaded
+                            if (window.SINU_APP && typeof window.SINU_APP.loadAdminUsers === 'function') {
+                                window.SINU_APP.loadAdminUsers();
+                            } else {
+                                console.error("Admin functions not available.");
+                            }
+                        });
+                    } else {
+                        newAdminButton.classList.add('hidden');
                     }
                 }
-            } catch (error) {
-                console.error("Error fetching user approval status:", error);
+                // --- END OF NEW LOGIC ---
+
+                showDashboardSection();
+                setupFilterButtons();
+                loadConstructionSites();
+                primeSearchCache(); // Initialize the cache for global search
+
+            } else {
+                // This handles users who are not approved yet
                 currentUserRole = null;
                 showAuthSection();
-                if (authTitle) authTitle.textContent = "Error de Cuenta";
-                if (loginFormContainer) loginFormContainer.innerHTML = `<p class="text-red-500 text-center">Error al verificar el estado de su cuenta. Por favor, intente recargar la página o contacte soporte.</p>
-                    <button id="logout-error-button" class="w-full mt-4 bg-nova-green hover:bg-nova-green-dark text-white font-bold py-2 px-4 rounded">Cerrar Sesión</button>`;
-                if (registrationArea) registrationArea.innerHTML = '';
-                const logoutErrorButton = document.getElementById('logout-error-button');
-                if (logoutErrorButton) logoutErrorButton.addEventListener('click', () => auth.signOut());
+                if (authTitle) authTitle.textContent = "Cuenta Pendiente de Aprobación";
+                if (loginFormContainer) {
+                    loginFormContainer.innerHTML = `
+                        <p class="text-center text-nova-gray-dark mb-4">
+                            Su cuenta (${user.email || 'Nueva cuenta'}) ha sido registrada pero está pendiente de aprobación por un administrador.
+                            Por favor, intente iniciar sesión más tarde o contacte al administrador.
+                        </p>
+                        <button id="logout-pending-button" class="w-full mt-4 bg-nova-green hover:bg-nova-green-dark text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition-colors duration-150">
+                            Cerrar Sesión
+                        </button>
+                    `;
+                    if (registrationArea) registrationArea.innerHTML = '';
+                    const logoutPendingButton = document.getElementById('logout-pending-button');
+                    if (logoutPendingButton) {
+                        logoutPendingButton.addEventListener('click', () => auth.signOut());
+                    }
+                }
             }
-        } else {
+        } catch (error) {
+            console.error("Error fetching user approval status:", error);
             currentUserRole = null;
-            if (dashboardTitle) dashboardTitle.textContent = 'Panel Principal';
-            if (authTitle) authTitle.textContent = 'Bienvenido';
             showAuthSection();
-            if (sitesListContainer) sitesListContainer.innerHTML = '<p class="text-nova-gray">Cargando obras...</p>';
-            if (addSiteFormContainer) addSiteFormContainer.innerHTML = '';
-            renderLoginForm();
+            if (authTitle) authTitle.textContent = "Error de Cuenta";
+            if (loginFormContainer) loginFormContainer.innerHTML = `<p class="text-red-500 text-center">Error al verificar el estado de su cuenta. Por favor, intente recargar la página o contacte soporte.</p>
+                <button id="logout-error-button" class="w-full mt-4 bg-nova-green hover:bg-nova-green-dark text-white font-bold py-2 px-4 rounded">Cerrar Sesión</button>`;
+            if (registrationArea) registrationArea.innerHTML = '';
+            const logoutErrorButton = document.getElementById('logout-error-button');
+            if (logoutErrorButton) logoutErrorButton.addEventListener('click', () => auth.signOut());
         }
-    });
+    } else {
+        // This handles when no user is logged in
+        currentUserRole = null;
+        if (dashboardTitle) dashboardTitle.textContent = 'Panel Principal';
+        if (authTitle) authTitle.textContent = 'Bienvenido';
+        showAuthSection();
+        if (sitesListContainer) sitesListContainer.innerHTML = '<p class="text-nova-gray">Cargando obras...</p>';
+        if (addSiteFormContainer) addSiteFormContainer.innerHTML = '';
+        renderLoginForm();
+    }
+});
 
     // --- Logout Functionality ---
     if (logoutButton) {
@@ -639,6 +770,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                     <button class="transfer-item-btn text-xs bg-yellow-500 hover:bg-yellow-600 text-black py-1 px-2 rounded" data-item-id="${itemId}" data-site-id="${siteId}" data-site-name="${siteName}">Transferir</button>
                                 ` : ''}
                                 <button class="view-history-btn text-xs bg-gray-400 hover:bg-gray-500 text-white py-1 px-2 rounded" data-item-id="${itemId}" data-item-name="${escapedItemName}">Historial</button>
+                                <button class="maintenance-log-btn text-xs bg-orange-500 hover:bg-orange-600 text-white py-1 px-2 rounded" data-item-id="${itemId}" data-item-name="${escapedItemName}" data-site-id="${siteId}" data-site-name="${siteName}">Bitácora</button>
                             </div>
                         </td>
                     </tr>
@@ -701,6 +833,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     const itemId = e.target.dataset.itemId;
                     const itemName = e.target.dataset.itemName;
                     showItemHistory(itemId, itemName);
+                });
+            });
+
+            document.querySelectorAll('.maintenance-log-btn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const itemId = e.target.dataset.itemId;
+                    const itemName = e.target.dataset.itemName;
+                    const siteId = e.target.dataset.siteId;
+                    const siteName = e.target.dataset.siteName;
+                    showMaintenanceLog(itemId, itemName, siteId, siteName);
                 });
             });
         } catch (error) {
@@ -1366,6 +1508,10 @@ document.addEventListener('DOMContentLoaded', () => {
         historyModalTitle.textContent = `Historial para: ${escapedItemName}`;
         historyModalContent.innerHTML = '<p class="text-nova-gray p-4">Cargando historial...</p>';
         historyModal.classList.remove('hidden');
+
+        // Store data for PDF export
+        historyModal.dataset.itemId = itemId;
+        historyModal.dataset.itemName = itemName;
         try {
             const historySnapshot = await db.collection("inventoryItems").doc(itemId).collection("history").orderBy("timestamp", "desc").get();
             if (historySnapshot.empty) {
@@ -1401,6 +1547,165 @@ document.addEventListener('DOMContentLoaded', () => {
             historyModalContent.innerHTML = `<p class="text-red-500 p-4">Error al cargar el historial: ${error.message}</p>`;
         }
     }
+
+    async function exportHistoryToPDF() {
+    const itemId = historyModal.dataset.itemId;
+    const itemName = historyModal.dataset.itemName;
+    
+    if (!itemId || !window.jspdf) {
+        alert('Error: No se puede generar el PDF.');
+        return;
+    }
+    
+    try {
+        const { jsPDF } = window.jspdf;
+        // Create PDF in LANDSCAPE orientation
+        const doc = new jsPDF('landscape', 'mm', 'a4');
+        
+        // Header
+        doc.setFontSize(20);
+        doc.setTextColor(6, 78, 59); // Nova green dark
+        doc.text('NOVA URBANO SAS', 148, 20, { align: 'center' }); // Centered for landscape
+        
+        doc.setFontSize(16);
+        doc.text('Historial de Movimientos', 148, 30, { align: 'center' });
+        
+        // Item info
+        doc.setFontSize(12);
+        doc.setTextColor(0, 0, 0);
+        doc.text(`Ítem: ${itemName}`, 20, 45);
+        
+        // Get the item details for more info
+        const itemDoc = await db.collection("inventoryItems").doc(itemId).get();
+        if (itemDoc.exists) {
+            const itemData = itemDoc.data();
+            doc.text(`NUI: ${itemData.nui || 'N/A'}`, 20, 52);
+            if (itemData.serialModel) {
+                doc.text(`Serial/Modelo: ${itemData.serialModel}`, 20, 59);
+            }
+            
+            // Get site name
+            const siteDoc = await db.collection("constructionSites").doc(itemData.siteId).get();
+            if (siteDoc.exists) {
+                doc.text(`Ubicación Actual: ${siteDoc.data().name}`, 20, 66);
+            }
+        }
+        
+        // Report metadata - positioned to the right for landscape
+        doc.setFontSize(10);
+        doc.setTextColor(100, 100, 100);
+        const reportDate = new Date().toLocaleString('es-CO');
+        doc.text(`Fecha del reporte: ${reportDate}`, 200, 52);
+        
+        const currentUser = auth.currentUser;
+        let generatedBy = 'Usuario';
+        if (currentUser) {
+            const userDoc = await db.collection("users").doc(currentUser.uid).get();
+            if (userDoc.exists) {
+                const userData = userDoc.data();
+                generatedBy = `${userData.nombre || ''} ${userData.apellidos || ''}`.trim() || currentUser.email;
+            }
+        }
+        doc.text(`Generado por: ${generatedBy}`, 200, 59);
+        
+        // Get history entries
+        const historySnapshot = await db.collection("inventoryItems").doc(itemId).collection("history").orderBy("timestamp", "desc").get();
+        
+        if (historySnapshot.empty) {
+            doc.text('No hay movimientos registrados.', 20, 95);
+        } else {
+            // Prepare table data
+            const tableData = [];
+            
+            historySnapshot.forEach(doc => {
+                const log = doc.data();
+                const logDate = log.timestamp ? new Date(log.timestamp.seconds * 1000).toLocaleString('es-CO', {
+                    dateStyle: 'short',
+                    timeStyle: 'short'
+                }) : 'N/A';
+                
+                const user = `${log.userName || 'N/A'} ${log.userApellidos || ''}`.trim();
+                
+                // Create a summary of the action
+                let actionSummary = log.action || 'Acción desconocida';
+                let details = '';
+                
+                switch (log.action) {
+                    case 'CREADO':
+                        details = `Cantidad inicial: ${log.details?.createdWithQuantity || 'N/A'} ${log.details?.unit || ''}`;
+                        break;
+                    case 'CANTIDAD_AJUSTADA':
+                        details = `De ${log.details?.oldQuantity || 'N/A'} a ${log.details?.newQuantity || 'N/A'} - ${log.details?.reason || 'Sin motivo'}`;
+                        break;
+                    case 'TRANSFERENCIA_SALIDA':
+                        details = `${log.details?.quantityTransferred || 'N/A'} unidades a ${log.details?.toSiteName || 'N/A'}`;
+                        break;
+                    case 'TRANSFERENCIA_ENTRADA':
+                        details = `${log.details?.quantityReceivedOrUpdated || 'N/A'} unidades desde ${log.details?.fromSiteName || 'N/A'}`;
+                        break;
+                    case 'ITEM_ACTUALIZADO':
+                        details = `Campos: ${(log.details?.changedFields || []).join(', ')}`;
+                        break;
+                    case 'MANTENIMIENTO_REGISTRADO':
+                        details = `Tipo: ${log.details?.type || 'N/A'} - Costo: $${log.details?.cost || 0}`;
+                        break;
+                    default:
+                        details = log.details?.notes || 'Sin detalles';
+                }
+                
+                tableData.push([
+                    logDate,
+                    actionSummary,
+                    details,
+                    user,
+                    log.userCedula || 'N/A'
+                ]);
+            });
+            
+            // Create table - adjusted for landscape
+            doc.autoTable({
+                startY: 75,
+                head: [['Fecha/Hora', 'Acción', 'Detalles', 'Usuario', 'Cédula']],
+                body: tableData,
+                theme: 'grid',
+                headStyles: {
+                    fillColor: [6, 78, 59], // Nova green dark
+                    textColor: 255
+                },
+                alternateRowStyles: {
+                    fillColor: [243, 244, 246] // Nova gray light
+                },
+                styles: {
+                    fontSize: 9,
+                    cellPadding: 3
+                },
+                columnStyles: {
+                    0: { cellWidth: 40 },  // Date column
+                    1: { cellWidth: 45 },  // Action column
+                    2: { cellWidth: 110 }, // Details column - much wider now!
+                    3: { cellWidth: 50 },  // User column
+                    4: { cellWidth: 25 }   // Cedula column
+                },
+                margin: { left: 15, right: 15 }
+            });
+            
+            // Add footer note
+            const finalY = doc.lastAutoTable.finalY || 150;
+            doc.setFontSize(9);
+            doc.setTextColor(100, 100, 100);
+            doc.text('Este documento es un registro oficial del sistema SINU - Nova Urbano', 148, finalY + 10, { align: 'center' });
+            doc.text(`Los registros de mantenimiento siguen el NUI y están disponibles en todas las ubicaciones`, 148, finalY + 17, { align: 'center' });
+        }
+        
+        // Save the PDF
+        const fileName = `Historial_${itemName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
+        doc.save(fileName);
+        
+    } catch (error) {
+        console.error('Error generating history PDF:', error);
+        alert(`Error al generar el PDF: ${error.message}`);
+    }
+}
 
     function formatLogDetails(log) {
         if (!log.details || typeof log.details !== 'object' || Object.keys(log.details).length === 0) {
@@ -1454,6 +1759,461 @@ document.addEventListener('DOMContentLoaded', () => {
         detailsHTML += '</ul>';
         return detailsHTML;
     }
+
+    // --- Maintenance Log Functions ---
+    async function showMaintenanceLog(itemId, itemName, siteId, siteName) {
+    if (!maintenanceModal || !maintenanceModalTitle || !maintenanceModalContent) {
+        return;
+    }
+    
+    const escapedItemName = itemName ? itemName.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : 'Ítem Desconocido';
+    maintenanceModalTitle.textContent = `Bitácora de Mantenimiento: ${escapedItemName}`;
+    maintenanceModalContent.innerHTML = '<p class="text-nova-gray p-4">Cargando bitácora...</p>';
+    maintenanceModal.classList.remove('hidden');
+    
+    // Store data for adding new entries and PDF export
+    maintenanceModal.dataset.itemId = itemId;
+    maintenanceModal.dataset.itemName = itemName;
+    maintenanceModal.dataset.siteId = siteId;
+    maintenanceModal.dataset.siteName = siteName;
+    
+    try {
+        // Get item data to find NUI
+        const itemDoc = await db.collection("inventoryItems").doc(itemId).get();
+        if (!itemDoc.exists) {
+            maintenanceModalContent.innerHTML = '<p class="text-red-500 p-4">Error: Ítem no encontrado.</p>';
+            return;
+        }
+        
+        const itemData = itemDoc.data();
+        const itemNUI = itemData.nui;
+        
+        // Get maintenance by NUI from global collection
+        const maintenanceSnapshot = await db.collection("maintenanceLogs")
+            .where("nui", "==", itemNUI)
+            .orderBy("serviceDate", "desc")
+            .get();
+        
+        let maintenanceHTML = '';
+        
+        // Add NUI display
+        maintenanceHTML += `
+            <div class="mb-4 p-2 bg-gray-100 rounded">
+                <p class="text-sm text-gray-700">
+                    <strong>NUI:</strong> ${itemNUI} - El historial sigue este identificador único
+                </p>
+            </div>
+        `;
+        
+        // Add warning note if quantity > 1
+        if (itemData.quantity > 1) {
+            maintenanceHTML += `
+                <div class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p class="text-sm text-yellow-800">
+                        ⚠️ <strong>Nota:</strong> Este ítem tiene cantidad ${itemData.quantity}. 
+                        La bitácora aplica al grupo completo.
+                    </p>
+                </div>
+            `;
+        }
+        
+        if (maintenanceSnapshot.empty) {
+            maintenanceHTML += '<p class="text-nova-gray p-4">No hay entradas de mantenimiento para este ítem.</p>';
+        } else {
+            let totalCost = 0;
+            
+            // Calculate total cost
+            maintenanceSnapshot.forEach(doc => {
+                const entry = doc.data();
+                totalCost += entry.cost || 0;
+            });
+            
+            // Show total cost
+            if (totalCost > 0) {
+                maintenanceHTML += `
+                    <div class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <p class="text-lg font-bold text-yellow-800">Costo Total de Mantenimiento: $${totalCost.toLocaleString('es-CO')}</p>
+                    </div>
+                `;
+            }
+            
+            maintenanceHTML += '<ul class="space-y-4">';
+            
+            maintenanceSnapshot.forEach(doc => {
+                const entry = doc.data();
+                const cost = entry.cost || 0;
+                
+                const serviceDate = entry.serviceDate ? new Date(entry.serviceDate.seconds * 1000).toLocaleDateString('es-CO') : 'Fecha desconocida';
+                const nextServiceDate = entry.nextServiceDate ? new Date(entry.nextServiceDate.seconds * 1000).toLocaleDateString('es-CO') : 'No programado';
+                
+                const typeLabels = {
+                    'preventivo': 'Preventivo',
+                    'correctivo': 'Correctivo',
+                    'inspeccion': 'Inspección',
+                    'reparacion': 'Reparación Mayor'
+                };
+                
+                const typeLabel = typeLabels[entry.type] || entry.type || 'Tipo desconocido';
+                const typeColor = entry.type === 'correctivo' || entry.type === 'reparacion' ? 'text-red-600' : 'text-green-600';
+                
+                maintenanceHTML += `
+                    <li class="p-4 bg-nova-gray-light rounded-lg shadow-sm border border-gray-200">
+                        <div class="flex justify-between items-start mb-2">
+                            <div>
+                                <p class="font-semibold text-nova-green-dark text-lg">${typeLabel}</p>
+                                <p class="text-sm text-gray-600">Fecha: ${serviceDate}</p>
+                                <p class="text-xs text-gray-500">Realizado en: ${entry.siteName || 'Ubicación no especificada'}</p>
+                            </div>
+                            <div class="text-right">
+                                ${cost > 0 ? `<p class="font-bold text-lg ${typeColor}">$${cost.toLocaleString('es-CO')}</p>` : ''}
+                                ${entry.hours ? `<p class="text-xs text-gray-500">${entry.hours}</p>` : ''}
+                            </div>
+                        </div>
+                        <div class="mt-2 space-y-1">
+                            <p class="text-sm"><span class="font-medium">Trabajo realizado:</span> ${entry.description || 'No especificado'}</p>
+                            <p class="text-sm"><span class="font-medium">Técnico/Proveedor:</span> ${entry.technician || 'No especificado'}</p>
+                            ${entry.nextServiceDate ? `<p class="text-sm"><span class="font-medium">Próximo servicio:</span> ${nextServiceDate}</p>` : ''}
+                            <p class="text-xs text-gray-500 mt-2">Registrado por: ${entry.userName || 'Usuario'} ${entry.userApellidos || ''}</p>
+                        </div>
+                    </li>
+                `;
+            });
+            
+            maintenanceHTML += '</ul>';
+        }
+        
+        // Success message
+        maintenanceHTML += `
+            <div class="mt-6 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p class="text-xs text-green-800">
+                    ✅ <strong>Transferencias sin problema:</strong> La bitácora sigue al NUI ${itemNUI}, 
+                    así que el historial completo está disponible sin importar dónde esté el equipo.
+                </p>
+            </div>
+        `;
+        
+        maintenanceModalContent.innerHTML = maintenanceHTML;
+        
+    } catch (error) {
+        maintenanceModalContent.innerHTML = `<p class="text-red-500 p-4">Error al cargar la bitácora: ${error.message}</p>`;
+    }
+}
+    
+    function showAddMaintenanceForm() {
+        const itemId = maintenanceModal.dataset.itemId;
+        const itemName = maintenanceModal.dataset.itemName;
+        const siteId = maintenanceModal.dataset.siteId;
+        const siteName = maintenanceModal.dataset.siteName;
+        
+        if (!addMaintenanceModal || !addMaintenanceForm) return;
+        
+        // Set hidden inputs
+        document.getElementById('maintenance-item-id').value = itemId;
+        document.getElementById('maintenance-item-name').value = itemName;
+        document.getElementById('maintenance-site-id').value = siteId;
+        document.getElementById('maintenance-site-name').value = siteName;
+        
+        // Reset form
+        addMaintenanceForm.reset();
+        document.getElementById('maintenance-date').value = new Date().toISOString().split('T')[0]; // Today's date
+        document.getElementById('add-maintenance-error').textContent = '';
+        
+        addMaintenanceModal.classList.remove('hidden');
+    }
+    
+    async function handleAddMaintenanceSubmit(event) {
+    event.preventDefault();
+    if (currentUserRole !== 'oficina') return;
+    
+    const form = event.target;
+    const itemId = document.getElementById('maintenance-item-id').value;
+    const itemName = document.getElementById('maintenance-item-name').value;
+    const siteId = document.getElementById('maintenance-site-id').value;
+    const siteName = document.getElementById('maintenance-site-name').value;
+    
+    const submitButton = form.querySelector('button[type="submit"]');
+    const originalButtonText = submitButton.textContent;
+    const errorElement = document.getElementById('add-maintenance-error');
+    
+    // Clear any previous errors
+    if (errorElement) errorElement.textContent = '';
+    
+    try {
+        // Get the NUI from the item
+        const itemDoc = await db.collection("inventoryItems").doc(itemId).get();
+        if (!itemDoc.exists) {
+            if (errorElement) errorElement.textContent = 'Error: Item no encontrado';
+            return;
+        }
+        const itemNUI = itemDoc.data().nui;
+        
+        const serviceDate = form.elements['maintenanceDate'].value;
+        const type = form.elements['maintenanceType'].value;
+        const description = form.elements['maintenanceDescription'].value.trim();
+        const costStr = form.elements['maintenanceCost'].value;
+        const technician = form.elements['maintenanceTechnician'].value.trim();
+        const hours = form.elements['maintenanceHours'].value.trim();
+        const nextServiceDate = form.elements['nextMaintenanceDate'].value;
+        
+        if (!serviceDate || !type || !description || !technician) {
+            if (errorElement) errorElement.textContent = 'Por favor complete todos los campos obligatorios.';
+            return;
+        }
+        
+        const cost = costStr ? parseFloat(costStr) : 0;
+        
+        const user = auth.currentUser;
+        if (!user) {
+            if (errorElement) errorElement.textContent = 'Error de autenticación.';
+            return;
+        }
+        
+        // Set loading state
+        submitButton.disabled = true;
+        submitButton.textContent = 'Guardando...';
+        
+        let performingUserName = "Usuario Desconocido";
+        let performingUserApellidos = "";
+        let performingUserCedula = "";
+        
+        const userProfileSnap = await db.collection("users").doc(user.uid).get();
+        if (userProfileSnap.exists) {
+            const userData = userProfileSnap.data();
+            performingUserName = userData.nombre || performingUserName;
+            performingUserApellidos = userData.apellidos || "";
+            performingUserCedula = userData.cedula || "";
+        }
+        
+        const timestamp = firebase.firestore.FieldValue.serverTimestamp();
+        
+        // Create maintenance entry in GLOBAL collection
+        const maintenanceData = {
+            nui: itemNUI, // This is the KEY - maintenance follows NUI
+            itemName: itemName, // For reference
+            serviceDate: firebase.firestore.Timestamp.fromDate(new Date(serviceDate)),
+            type: type,
+            description: description,
+            cost: cost,
+            technician: technician,
+            hours: hours,
+            siteId: siteId, // Where maintenance was performed
+            siteName: siteName,
+            userId: user.uid,
+            userName: performingUserName,
+            userApellidos: performingUserApellidos,
+            userCedula: performingUserCedula,
+            createdAt: timestamp
+        };
+        
+        if (nextServiceDate) {
+            maintenanceData.nextServiceDate = firebase.firestore.Timestamp.fromDate(new Date(nextServiceDate));
+        }
+        
+        // Add to GLOBAL maintenance collection
+        await db.collection("maintenanceLogs").add(maintenanceData);
+        
+        // Still add to history for tracking
+        await db.collection("inventoryItems").doc(itemId).collection("history").add({
+            timestamp: timestamp,
+            userId: user.uid,
+            userName: performingUserName,
+            userApellidos: performingUserApellidos,
+            userCedula: performingUserCedula,
+            nui: itemNUI,
+            action: "MANTENIMIENTO_REGISTRADO",
+            details: {
+                type: type,
+                serviceDate: serviceDate,
+                cost: cost,
+                technician: technician,
+                notes: `Mantenimiento ${type} realizado. ${description}`
+            }
+        });
+        
+        // Update ALL items with this NUI across ALL sites
+        const allItemsWithNUI = await db.collection("inventoryItems").where("nui", "==", itemNUI).get();
+        const batch = db.batch();
+        
+        allItemsWithNUI.forEach(doc => {
+            batch.update(doc.ref, {
+                lastMaintenanceDate: firebase.firestore.Timestamp.fromDate(new Date(serviceDate)),
+                nextMaintenanceDate: nextServiceDate ? firebase.firestore.Timestamp.fromDate(new Date(nextServiceDate)) : null,
+                lastUpdatedAt: timestamp
+            });
+        });
+        
+        await batch.commit();
+        
+        // SUCCESS: Close modal and refresh
+        if (addMaintenanceModal) addMaintenanceModal.classList.add('hidden');
+        showMaintenanceLog(itemId, itemName, siteId, siteName); // Refresh the log
+        
+    } catch (error) {
+        console.error('Error saving maintenance record:', error);
+        if (errorElement) errorElement.textContent = `Error al guardar: ${error.message}`;
+    } finally {
+        // ALWAYS reset the button state, regardless of success or error
+        submitButton.disabled = false;
+        submitButton.textContent = originalButtonText;
+    }
+}
+    
+    async function exportMaintenanceToPDF() {
+    const itemId = maintenanceModal.dataset.itemId;
+    const itemName = maintenanceModal.dataset.itemName;
+    const siteId = maintenanceModal.dataset.siteId;
+    const siteName = maintenanceModal.dataset.siteName;
+    
+    if (!itemId || !window.jspdf) {
+        alert('Error: No se puede generar el PDF.');
+        return;
+    }
+    
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        // Header
+        doc.setFontSize(20);
+        doc.setTextColor(6, 78, 59); // Nova green dark
+        doc.text('NOVA URBANO SAS', 105, 20, { align: 'center' });
+        
+        doc.setFontSize(16);
+        doc.text('Bitácora de Mantenimiento', 105, 30, { align: 'center' });
+        
+        // Get item details including NUI
+        const itemDoc = await db.collection("inventoryItems").doc(itemId).get();
+        if (!itemDoc.exists) {
+            alert('Error: Ítem no encontrado');
+            return;
+        }
+        
+        const itemData = itemDoc.data();
+        const itemNUI = itemData.nui;
+        
+        // Equipment info
+        doc.setFontSize(12);
+        doc.setTextColor(0, 0, 0);
+        doc.text(`Equipo: ${itemName}`, 20, 45);
+        doc.text(`NUI: ${itemNUI}`, 20, 52);
+        doc.text(`Ubicación Actual: ${siteName}`, 20, 59);
+        
+        if (itemData.serialModel) {
+            doc.text(`Serial/Modelo: ${itemData.serialModel}`, 20, 66);
+        }
+        
+        // Report metadata
+        doc.setFontSize(10);
+        doc.setTextColor(100, 100, 100);
+        const reportDate = new Date().toLocaleString('es-CO');
+        doc.text(`Fecha del reporte: ${reportDate}`, 20, 73);
+        
+        const currentUser = auth.currentUser;
+        let generatedBy = 'Usuario';
+        if (currentUser) {
+            const userDoc = await db.collection("users").doc(currentUser.uid).get();
+            if (userDoc.exists) {
+                const userData = userDoc.data();
+                generatedBy = `${userData.nombre || ''} ${userData.apellidos || ''}`.trim() || currentUser.email;
+            }
+        }
+        doc.text(`Generado por: ${generatedBy}`, 20, 80);
+        
+        // Get maintenance entries by NUI
+        const maintenanceSnapshot = await db.collection("maintenanceLogs")
+            .where("nui", "==", itemNUI)
+            .orderBy("serviceDate", "desc")
+            .get();
+        
+        if (maintenanceSnapshot.empty) {
+            doc.text('No hay entradas de mantenimiento registradas.', 20, 90);
+        } else {
+            // Prepare table data
+            const tableData = [];
+            let totalCost = 0;
+            
+            maintenanceSnapshot.forEach(doc => {
+                const entry = doc.data();
+                const cost = entry.cost || 0;
+                totalCost += cost;
+                
+                const serviceDate = entry.serviceDate ? new Date(entry.serviceDate.seconds * 1000).toLocaleDateString('es-CO') : 'N/A';
+                const typeLabels = {
+                    'preventivo': 'Preventivo',
+                    'correctivo': 'Correctivo',
+                    'inspeccion': 'Inspección',
+                    'reparacion': 'Reparación Mayor'
+                };
+                
+                tableData.push([
+                    serviceDate,
+                    typeLabels[entry.type] || entry.type || 'N/A',
+                    entry.description || 'N/A',
+                    entry.technician || 'N/A',
+                    entry.siteName || 'N/A', // Where maintenance was done
+                    cost > 0 ? `$${cost.toLocaleString('es-CO')}` : '-',
+                    entry.hours || '-'
+                ]);
+            });
+            
+            // Create table
+            doc.autoTable({
+                startY: 85,
+                head: [['Fecha', 'Tipo', 'Descripción', 'Técnico', 'Ubicación', 'Costo', 'Horas/Km']],
+                body: tableData,
+                theme: 'grid',
+                headStyles: {
+                    fillColor: [6, 78, 59], // Nova green dark
+                    textColor: 255
+                },
+                alternateRowStyles: {
+                    fillColor: [243, 244, 246] // Nova gray light
+                },
+                styles: {
+                    fontSize: 8,
+                    cellPadding: 2
+                },
+                columnStyles: {
+                    2: { cellWidth: 50 }, // Description column wider
+                    5: { halign: 'right' }, // Cost column right-aligned
+                    6: { halign: 'center' } // Hours column centered
+                }
+            });
+            
+            // Add total cost
+            const finalY = doc.lastAutoTable.finalY;
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            doc.text(`Costo Total de Mantenimiento: $${totalCost.toLocaleString('es-CO')}`, 20, finalY + 10);
+            
+            // Add NUI note
+            doc.setFont(undefined, 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(100, 100, 100);
+            doc.text(`Este historial corresponde al equipo con NUI ${itemNUI} en todas sus ubicaciones`, 105, finalY + 20, { align: 'center' });
+            
+            // Add signature lines
+            doc.setFontSize(10);
+            const signatureY = finalY + 35;
+            
+            // Supervisor signature
+            doc.line(20, signatureY, 80, signatureY);
+            doc.text('Supervisor de Mantenimiento', 50, signatureY + 5, { align: 'center' });
+            
+            // Manager signature
+            doc.line(130, signatureY, 190, signatureY);
+            doc.text('Gerente de Operaciones', 160, signatureY + 5, { align: 'center' });
+        }
+        
+        // Save the PDF
+        const fileName = `Bitacora_${itemNUI}_${itemName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
+        doc.save(fileName);
+        
+    } catch (error) {
+        console.error('Error generating PDF:', error);
+        alert(`Error al generar el PDF: ${error.message}`);
+    }
+}
     
     // --- Event Listeners ---
     if (editItemForm) editItemForm.addEventListener('submit', (event) => {
@@ -1491,7 +2251,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (transferItemModal) transferItemModal.addEventListener('click', e => { if (e.target === transferItemModal) transferItemModal.classList.add('hidden'); });
     if (closeHistoryModalButton) closeHistoryModalButton.addEventListener('click', () => historyModal.classList.add('hidden'));
     if (historyModal) historyModal.addEventListener('click', e => { if (e.target === historyModal) historyModal.classList.add('hidden'); });
-
+    if (exportHistoryPdfBtn) {
+    exportHistoryPdfBtn.addEventListener('click', exportHistoryToPDF);
+}
     // Corrected Toggle Listener
     if (toggleZeroQtyCheckbox) {
         toggleZeroQtyCheckbox.addEventListener('change', () => {
@@ -1502,6 +2264,33 @@ document.addEventListener('DOMContentLoaded', () => {
             if (currentSiteId && currentSiteName) {
                 loadInventoryItems(currentSiteId, currentSiteName);
             }
+        });
+    }
+
+    // Maintenance Modal Event Listeners
+    if (closeMaintenanceModalButton) {
+        closeMaintenanceModalButton.addEventListener('click', () => maintenanceModal.classList.add('hidden'));
+    }
+    if (maintenanceModal) {
+        maintenanceModal.addEventListener('click', e => { 
+            if (e.target === maintenanceModal) maintenanceModal.classList.add('hidden'); 
+        });
+    }
+    if (addMaintenanceEntryBtn) {
+        addMaintenanceEntryBtn.addEventListener('click', showAddMaintenanceForm);
+    }
+    if (exportMaintenancePdfBtn) {
+        exportMaintenancePdfBtn.addEventListener('click', exportMaintenanceToPDF);
+    }
+    if (addMaintenanceForm) {
+        addMaintenanceForm.addEventListener('submit', handleAddMaintenanceSubmit);
+    }
+    if (cancelAddMaintenanceButton) {
+        cancelAddMaintenanceButton.addEventListener('click', () => addMaintenanceModal.classList.add('hidden'));
+    }
+    if (addMaintenanceModal) {
+        addMaintenanceModal.addEventListener('click', e => { 
+            if (e.target === addMaintenanceModal) addMaintenanceModal.classList.add('hidden'); 
         });
     }
 

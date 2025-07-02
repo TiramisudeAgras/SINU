@@ -76,23 +76,32 @@
             </section>
 
             <section id="dashboard-section" class="hidden">
+
                 <div class="flex justify-between items-center mb-6 p-4 bg-white rounded-lg shadow">
                     <h2 class="text-2xl font-semibold text-nova-green-dark" id="dashboard-title">Panel Principal</h2>
-                    <button id="logout-button" class="bg-nova-green-dark hover:bg-red-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition-colors duration-150">
-                        Cerrar Sesión
-                    </button>
+                    <div>
+                        <button id="admin-panel-button" class="hidden bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded mr-4">Admin Panel</button>
+                        <button id="logout-button" class="bg-nova-green-dark hover:bg-red-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition-colors duration-150">
+                            Cerrar Sesión
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mb-6 bg-white p-4 rounded-lg shadow">
+                    <h3 class="text-lg font-semibold text-nova-green-dark">Buscar Ítem en Todas las Ubicaciones</h3>
+                    <p class="text-sm text-nova-gray-dark">Busque por Nombre, Serial/Modelo, o NUI.</p>
+                    <div class="flex mt-2">
+                        <input type="text" id="global-search-input" placeholder="Ej: Taladro, TR-500, NUI-123ABC..." class="w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
+                    </div>
+                    <div id="global-search-results" class="mt-4"></div>
                 </div>
 
                 <div id="sites-section" class="bg-white p-6 rounded-lg shadow-lg mb-8">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-xl font-semibold text-nova-green-dark">Ubicaciones (Obras y Bodegas)</h3>
-                        <div id="add-site-button-container">
-                            </div>
+                        <div id="add-site-button-container"></div>
                     </div>
-                    
-                    <div id="add-site-form-container" class="mb-4">
-                        </div>
-
+                    <div id="add-site-form-container" class="mb-4"></div>
                     <div id="site-filter-container" class="flex space-x-2 mb-4 border-b pb-4">
                         <button id="filter-all" class="filter-btn active-filter-btn">Todos</button>
                         <button id="filter-obra" class="filter-btn">Obras</button>
@@ -105,7 +114,7 @@
                     </div>
                 </div>
 
-                <div id="inventory-section" class="hidden bg-white p-6 rounded-lg shadow-lg">
+                 <div id="inventory-section" class="hidden bg-white p-6 rounded-lg shadow-lg">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-xl font-semibold text-nova-green-dark">Inventario de: <span id="selected-site-name" class="text-nova-green"></span></h3>
                         <button id="back-to-sites-button" class="bg-nova-gray hover:bg-nova-gray-dark text-white font-bold py-2 px-3 rounded text-sm transition-colors duration-150">
@@ -115,7 +124,7 @@
 
                     <div class="flex items-center justify-between mb-4">
                         <div id="add-item-form-container" class="mb-6">
-                            </div>
+                        </div>
 
                         <div id="export-button-container" class="mb-6">
                             <button id="export-csv-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition-colors duration-150">
@@ -132,7 +141,28 @@
                     </div>
 
                     <div id="inventory-list" class="mb-4">
-                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="admin-section" class="hidden bg-white p-6 rounded-lg shadow-lg">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-semibold text-nova-green-dark">Panel de Administración de Usuarios</h2>
+                    <button id="back-to-dashboard-button" class="bg-nova-gray hover:bg-nova-gray-dark text-white font-bold py-2 px-3 rounded text-sm transition-colors duration-150">← Volver al Panel Principal</button>
+                </div>
+                
+                <!-- Add this legend -->
+                <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h3 class="text-sm font-semibold text-blue-800 mb-2">Roles del Sistema:</h3>
+                    <ul class="text-xs text-blue-700 space-y-1">
+                        <li><strong>Espectador:</strong> Solo puede ver el inventario (sin editar)</li>
+                        <li><strong>Oficina:</strong> Puede crear, editar, transferir items y gestionar mantenimiento</li>
+                        <li><strong>Admin:</strong> Todos los permisos + gestión de usuarios</li>
+                    </ul>
+                </div>
+                
+                <div id="user-list-container">
+                    <p>Cargando usuarios...</p>
                 </div>
             </section>
         </main>
@@ -146,6 +176,9 @@
         <div class="relative mx-auto p-5 sm:p-6 border w-full max-w-2xl shadow-lg rounded-md bg-white">
             <div class="mt-3">
                 <h3 class="text-xl leading-6 font-bold text-nova-green-dark text-center mb-4" id="history-modal-title">Historial del Ítem</h3>
+                <button id="export-history-pdf" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded text-sm">
+                    📄 Exportar PDF
+                </button>
                 <div class="mt-2 px-2 sm:px-4 py-3 max-h-[60vh] sm:max-h-[70vh] overflow-y-auto" id="history-modal-content">
                     <p class="text-nova-gray">Cargando historial...</p>
                 </div>
@@ -310,11 +343,119 @@
         </div>
     </div>
 
+    <!-- Maintenance Log Modal -->
+    <div id="maintenance-modal" class="fixed inset-0 bg-gray-800 bg-opacity-75 overflow-y-auto h-full w-full flex items-center justify-center hidden z-50 p-4">
+        <div class="relative mx-auto p-5 sm:p-6 border w-full max-w-4xl shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl leading-6 font-bold text-nova-green-dark" id="maintenance-modal-title">Bitácora de Mantenimiento</h3>
+                    <button id="export-maintenance-pdf" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded text-sm">
+                        📄 Exportar PDF
+                    </button>
+                </div>
+                <div class="mb-4">
+                    <button id="add-maintenance-entry-btn" class="bg-nova-green hover:bg-nova-green-dark text-white font-bold py-2 px-4 rounded text-sm">
+                        + Agregar Entrada de Mantenimiento
+                    </button>
+                </div>
+                <div class="mt-2 px-2 sm:px-4 py-3 max-h-[60vh] sm:max-h-[70vh] overflow-y-auto" id="maintenance-modal-content">
+                    <p class="text-nova-gray">Cargando bitácora...</p>
+                </div>
+                <div class="mt-4 px-2 sm:px-4 py-3 text-right">
+                    <button id="close-maintenance-modal-button"
+                            class="px-4 py-2 bg-nova-green hover:bg-nova-green-dark text-white text-base font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nova-green transition-colors duration-150">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Maintenance Entry Modal -->
+    <div id="add-maintenance-modal" class="fixed inset-0 bg-gray-800 bg-opacity-75 overflow-y-auto h-full w-full flex items-center justify-center hidden z-50 p-4">
+        <div class="relative mx-auto p-5 sm:p-6 border w-full max-w-lg shadow-lg rounded-md bg-white">
+            <form id="add-maintenance-form">
+                <h3 class="text-xl leading-6 font-bold text-nova-green-dark text-center mb-6">Agregar Entrada de Mantenimiento</h3>
+                
+                <input type="hidden" id="maintenance-item-id">
+                <input type="hidden" id="maintenance-item-name">
+                <input type="hidden" id="maintenance-site-id">
+                <input type="hidden" id="maintenance-site-name">
+                
+                <div class="space-y-4 max-h-[60vh] sm:max-h-[70vh] overflow-y-auto pr-2 mb-6">
+                    <div>
+                        <label for="maintenance-date" class="block text-sm font-medium text-nova-gray-dark">Fecha del Servicio</label>
+                        <input type="date" id="maintenance-date" name="maintenanceDate" required
+                               class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="maintenance-type" class="block text-sm font-medium text-nova-gray-dark">Tipo de Mantenimiento</label>
+                        <select id="maintenance-type" name="maintenanceType" required
+                                class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
+                            <option value="">Seleccione tipo...</option>
+                            <option value="preventivo">Preventivo</option>
+                            <option value="correctivo">Correctivo</option>
+                            <option value="inspeccion">Inspección</option>
+                            <option value="reparacion">Reparación Mayor</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="maintenance-description" class="block text-sm font-medium text-nova-gray-dark">Descripción del Trabajo</label>
+                        <textarea id="maintenance-description" name="maintenanceDescription" rows="3" required
+                                  class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"
+                                  placeholder="Ej: Cambio de aceite, revisión de frenos, etc."></textarea>
+                    </div>
+                    <div>
+                        <label for="maintenance-cost" class="block text-sm font-medium text-nova-gray-dark">Costo (COP)</label>
+                        <input type="number" id="maintenance-cost" name="maintenanceCost" min="0" step="1000"
+                               class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"
+                               placeholder="Ej: 500000">
+                    </div>
+                    <div>
+                        <label for="maintenance-technician" class="block text-sm font-medium text-nova-gray-dark">Técnico/Proveedor</label>
+                        <input type="text" id="maintenance-technician" name="maintenanceTechnician" required
+                               class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"
+                               placeholder="Ej: Juan Pérez - Taller XYZ">
+                    </div>
+                    <div>
+                        <label for="maintenance-hours" class="block text-sm font-medium text-nova-gray-dark">Horas de Operación/Kilometraje</label>
+                        <input type="text" id="maintenance-hours" name="maintenanceHours"
+                               class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"
+                               placeholder="Ej: 1,250 horas">
+                    </div>
+                    <div>
+                        <label for="next-maintenance-date" class="block text-sm font-medium text-nova-gray-dark">Próximo Mantenimiento</label>
+                        <input type="date" id="next-maintenance-date" name="nextMaintenanceDate"
+                               class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
+                    </div>
+                </div>
+
+                <p id="add-maintenance-error" class="my-2 text-center text-sm text-red-600"></p>
+                
+                <div class="flex justify-end space-x-3">
+                    <button type="button" id="cancel-add-maintenance-button"
+                            class="px-4 py-2 bg-gray-200 text-gray-700 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-colors duration-150">
+                        Cancelar
+                    </button>
+                    <button type="submit"
+                            class="px-4 py-2 bg-nova-green hover:bg-nova-green-dark text-white text-base font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nova-green transition-colors duration-150">
+                        Guardar Entrada
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 
     <script src="app.js"></script>
+    <script src="admin.js"></script>
 </body>
 </html>
