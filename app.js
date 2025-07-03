@@ -922,6 +922,15 @@ function attachInventoryButtonListeners() {
             return;
         }
 
+        // --- NEW: Filter out items with zero quantity ---
+        const itemsToExport = inventorySnapshot.docs.filter(doc => doc.data().quantity > 0);
+
+        // --- NEW: Check if there's anything left to export ---
+        if (itemsToExport.length === 0) {
+            alert(`No hay ítems con stock disponible para exportar en ${siteName}.`);
+            return;
+        }
+
         const headers = [
             "NUI",
             "Nombre del Ítem",
@@ -934,23 +943,18 @@ function attachInventoryButtonListeners() {
             "Última Actualización"
         ];
 
-        // --- INICIO DE LA SECCIÓN MEJORADA ---
-
-        // Función auxiliar para formatear cada campo de forma segura para CSV
         const toCsvField = (value) => {
             const stringValue = String(value === undefined || value === null ? '' : value);
-            // Si el valor contiene comas, comillas o saltos de línea, lo encapsulamos entre comillas dobles.
-            // También, duplicamos cualquier comilla doble que ya exista dentro del valor.
             if (/[",\n\r]/.test(stringValue)) {
                 return `"${stringValue.replace(/"/g, '""')}"`;
             }
             return stringValue;
         };
 
-        const rows = inventorySnapshot.docs.map(doc => {
+        // --- MODIFIED: Map over the filtered 'itemsToExport' array ---
+        const rows = itemsToExport.map(doc => {
             const item = doc.data();
             
-            // 1. Formatear la fecha a un estándar sin comas (YYYY-MM-DD HH:MM:SS)
             let lastUpdated = 'N/A';
             if (item.lastUpdatedAt && item.lastUpdatedAt.toDate) {
                 const d = item.lastUpdatedAt.toDate();
@@ -958,24 +962,20 @@ function attachInventoryButtonListeners() {
                 lastUpdated = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
             }
             
-            // 2. Mapear los datos a un array
             const rowData = [
                 item.nui,
                 item.itemName,
                 item.quantity,
                 item.unit,
                 item.serialModel,
-                item.condition, // Este es el campo que daba problemas
+                item.condition,
                 item.description,
                 item.status,
                 lastUpdated
             ];
 
-            // 3. Aplicar el formato seguro a cada campo y luego unirlos
             return rowData.map(toCsvField).join(',');
         });
-
-        // --- FIN DE LA SECCIÓN MEJORADA ---
 
         const csvContent = [headers.join(','), ...rows].join('\n');
         const bom = new Uint8Array([0xEF, 0xBB, 0xBF]); 
