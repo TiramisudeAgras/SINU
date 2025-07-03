@@ -2349,4 +2349,29 @@ function attachInventoryButtonListeners() {
         });
     }
 
+    const localInventoryFilter = document.getElementById('local-inventory-filter');
+
+    if (localInventoryFilter) {
+        localInventoryFilter.addEventListener('keyup', () => {
+            const query = localInventoryFilter.value.toLowerCase().trim();
+
+            // If the filter is empty, show all items from the cache
+            if (!query) {
+                renderInventoryTable(currentInventoryCache);
+                return;
+            }
+
+            // Otherwise, filter the main cache
+            const filteredItems = currentInventoryCache.filter(item => {
+                const nameMatch = item.itemName?.toLowerCase().includes(query);
+                const serialMatch = item.serialModel?.toLowerCase().includes(query);
+                const nuiMatch = item.nui?.toLowerCase().includes(query);
+                return nameMatch || serialMatch || nuiMatch;
+            });
+
+            // Render the table with only the filtered items
+            renderInventoryTable(filteredItems);
+        });
+    }
+
 }); // End DOMContentLoaded
