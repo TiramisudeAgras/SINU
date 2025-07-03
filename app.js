@@ -28,6 +28,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let showZeroQuantityItems = false;
     let currentSiteFilter = 'all'; // <-- ADD THIS LINE
 
+    let currentInventoryCache = [];
+    let sortColumn = 'itemName';
+    let sortDirection = 'asc';
+
     // --- DOM Element References ---
     const authSection = document.getElementById('auth-section');
     const authTitle = document.getElementById('auth-title');
@@ -131,24 +135,31 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (searchInput) {
-        searchInput.addEventListener('keyup', (e) => {
-            const query = e.target.value.toLowerCase().trim();
-            
-            if (query.length < 3) {
-                searchResultsContainer.innerHTML = '';
-                return;
-            }
+    searchInput.addEventListener('keyup', (e) => {
+        const query = e.target.value.toLowerCase().trim();
+        
+        if (query.length < 3) {
+            searchResultsContainer.innerHTML = '';
+            return;
+        }
 
-            const results = allItemsCache.filter(item => {
-                const nameMatch = item.itemName?.toLowerCase().includes(query);
-                const serialMatch = item.serialModel?.toLowerCase().includes(query);
-                const nuiMatch = item.nui?.toLowerCase().includes(query);
-                return nameMatch || serialMatch || nuiMatch;
-            });
+        const results = allItemsCache.filter(item => {
+            // Condition 1: Check if the item's text matches the query
+            const nameMatch = item.itemName?.toLowerCase().includes(query);
+            const serialMatch = item.serialModel?.toLowerCase().includes(query);
+            const nuiMatch = item.nui?.toLowerCase().includes(query);
+            const hasTextMatch = nameMatch || serialMatch || nuiMatch;
 
-            displaySearchResults(results);
+            // Condition 2: Check if the item is in stock
+            const isInStock = item.quantity > 0;
+
+            // Return true only if both conditions are met
+            return hasTextMatch && isInStock;
         });
-    }
+
+        displaySearchResults(results);
+    });
+}
 
     function displaySearchResults(results) {
         if (!searchResultsContainer) return;
@@ -323,148 +334,156 @@ auth.onAuthStateChanged(async user => {
 
     // --- Login/Signup Forms (No Changes) ---
     function renderLoginForm() {
-        if (!loginFormContainer) return;
-        if (authTitle) authTitle.textContent = 'Bienvenido';
-        loginFormContainer.innerHTML = `
-            <form id="login-form" class="space-y-6">
-                <div>
-                    <label for="login-email" class="block text-sm font-medium text-nova-gray-dark">Correo Electrónico</label>
-                    <input type="email" id="login-email" name="email" required autocomplete="email"
-                           class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
-                </div>
-                <div>
-                    <label for="login-password" class="block text-sm font-medium text-nova-gray-dark">Contraseña</label>
-                    <input type="password" id="login-password" name="password" required autocomplete="current-password"
-                           class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
-                </div>
-                <div>
-                    <button type="submit"
-                            class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-nova-green hover:bg-nova-green-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nova-green-dark transition-colors duration-150">
-                        Iniciar Sesión
-                    </button>
-                </div>
-            </form>
-            <p id="login-error" class="mt-2 text-center text-sm text-red-600"></p>
+    if (!loginFormContainer) return;
+    if (authTitle) authTitle.textContent = 'Bienvenido';
+    loginFormContainer.innerHTML = `
+        <form id="login-form" class="space-y-6">
+            <div>
+                <label for="login-email" class="block text-sm font-medium text-nova-gray-dark">Correo Electrónico</label>
+                <input type="email" id="login-email" name="email" required autocomplete="email"
+                       class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
+            </div>
+            <div>
+                <label for="login-password" class="block text-sm font-medium text-nova-gray-dark">Contraseña</label>
+                <input type="password" id="login-password" name="password" required autocomplete="current-password"
+                       class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
+            </div>
+            
+            <div class="text-center my-4 p-3 bg-gray-50 rounded-md border">
+                <p class="text-sm font-medium text-nova-gray-dark mb-2">Verificación de Seguridad</p>
+                <div id="login-turnstile-container" class="flex justify-center"></div>
+                <p class="text-xs text-nova-gray mt-2">Por favor, complete este paso para continuar.</p>
+            </div>
+            <div>
+                <button type="submit" id="login-submit-button" disabled
+                        class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-nova-green hover:bg-nova-green-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nova-green-dark transition-colors duration-150 disabled:bg-nova-gray disabled:cursor-not-allowed">
+                    Iniciar Sesión
+                </button>
+            </div>
+        </form>
+        <p id="login-error" class="mt-2 text-center text-sm text-red-600"></p>
+    `;
+
+    if (registrationArea) {
+        registrationArea.innerHTML = `
+            <p class="text-sm text-nova-gray-dark">¿No tienes cuenta?
+                <a href="#" id="show-signup-link" class="font-medium text-nova-green hover:text-nova-green-dark">Regístrate aquí</a>
+            </p>
         `;
-        if (registrationArea) {
-            registrationArea.innerHTML = `
-                <p class="text-sm text-nova-gray-dark">¿No tienes cuenta?
-                    <a href="#" id="show-signup-link" class="font-medium text-nova-green hover:text-nova-green-dark">Regístrate aquí</a>
-                </p>
-            `;
-            const showSignupLink = document.getElementById('show-signup-link');
-            if (showSignupLink) {
-                showSignupLink.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    renderSignupForm();
-                });
+        document.getElementById('show-signup-link').addEventListener('click', (e) => {
+            e.preventDefault();
+            renderSignupForm();
+        });
+    }
+
+    function renderWidget() {
+        if (typeof turnstile !== 'undefined') {
+            turnstile.render('#login-turnstile-container', {
+                // FIXED: Placeholder now uses double quotes to match the build script
+                sitekey: "%TURNSTILE_SITEKEY%",
+                language: 'es', 
+                theme: 'dark',
+                callback: function(token) {
+                    const button = document.getElementById('login-submit-button');
+                    if (button) {
+                        button.disabled = false;
+                    }
+                },
+            });
+        }
+    }
+
+    if (window.turnstileLoaded) {
+        renderWidget();
+    } else {
+        const interval = setInterval(() => {
+            if (window.turnstileLoaded) {
+                renderWidget();
+                clearInterval(interval);
             }
-        }
-        const loginForm = document.getElementById('login-form');
-        if (loginForm) {
-            loginForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const email = loginForm['login-email'].value;
-                const password = loginForm['login-password'].value;
-                const loginErrorEl = document.getElementById('login-error');
-                if (loginErrorEl) loginErrorEl.textContent = '';
-                try {
-                    await auth.signInWithEmailAndPassword(email, password);
-                } catch (error) {
-                    if (loginErrorEl) loginErrorEl.textContent = getFirebaseAuthErrorMessage(error);
-                }
-            });
-        }
+        }, 100);
     }
 
-    function renderSignupForm() {
-        if (!loginFormContainer) return;
-        if (authTitle) authTitle.textContent = 'Crear Nueva Cuenta';
-        loginFormContainer.innerHTML = `
-            <form id="signup-form" class="space-y-3">
-                <div><label for="signup-nombre" class="block text-sm font-medium text-nova-gray-dark">Nombre(s)</label><input type="text" id="signup-nombre" name="nombre" required autocomplete="given-name" class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"><p class="mt-1 text-xs text-nova-gray">Ej: Alonso</p></div>
-                <div><label for="signup-apellidos" class="block text-sm font-medium text-nova-gray-dark">Apellidos</label><input type="text" id="signup-apellidos" name="apellidos" required autocomplete="family-name" class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"><p class="mt-1 text-xs text-nova-gray">Ej: Quijano Saavedra</p></div>
-                <div><label for="signup-cedula" class="block text-sm font-medium text-nova-gray-dark">Número de Cédula</label><input type="text" id="signup-cedula" name="cedula" required class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"><p class="mt-1 text-xs text-nova-gray">Ej: 1234567890</p></div>
-                <div><label for="signup-email" class="block text-sm font-medium text-nova-gray-dark">Correo Electrónico</label><input type="email" id="signup-email" name="email" required autocomplete="email" class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"></div>
-                <div><label for="signup-password" class="block text-sm font-medium text-nova-gray-dark">Contraseña</label><input type="password" id="signup-password" name="password" required autocomplete="new-password" class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"></div>
-                <div><label for="signup-confirm-password" class="block text-sm font-medium text-nova-gray-dark">Confirmar Contraseña</label><input type="password" id="signup-confirm-password" name="confirm-password" required autocomplete="new-password" class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"></div>
-                <div class="text-xs text-nova-gray-dark">La contraseña debe tener al menos 12 caracteres e incluir al menos uno de los siguientes símbolos: & % # "</div>
-                <div class="pt-2 flex items-start"><div class="flex items-center h-5"><input id="data-consent" name="dataConsent" type="checkbox" required class="focus:ring-nova-green h-4 w-4 text-nova-green border-gray-300 rounded"></div><div class="ml-3 text-sm"><label for="data-consent" class="font-medium text-nova-gray-dark">Acepto que mis datos sean tratados de acuerdo con la Ley de Protección de Datos de Colombia (Ley 1581 de 2012) y la Política de Tratamiento de Datos de Nova Urbano.</label></div></div>
-                <div class="pt-2"><button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-nova-green hover:bg-nova-green-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nova-green-dark transition-colors duration-150">Registrarse</button></div>
-            </form>
-            <p id="signup-error" class="mt-2 text-center text-sm text-red-600"></p>
-        `;
-        if (registrationArea) {
-            registrationArea.innerHTML = `<p class="text-sm text-nova-gray-dark">¿Ya tienes cuenta? <a href="#" id="show-login-link" class="font-medium text-nova-green hover:text-nova-green-dark">Inicia sesión aquí</a></p>`;
-            document.getElementById('show-login-link').addEventListener('click', (e) => {
-                e.preventDefault();
-                renderLoginForm();
-            });
-        }
-        document.getElementById('signup-form').addEventListener('submit', handleSignupSubmit);
-    }
-
-    async function handleSignupSubmit(event) {
-        event.preventDefault();
-        const form = event.target;
-        const nombre = form['signup-nombre'].value.trim();
-        const apellidos = form['signup-apellidos'].value.trim();
-        const cedula = form['signup-cedula'].value.trim();
-        const email = form['signup-email'].value;
-        const password = form['signup-password'].value;
-        const confirmPassword = form['signup-confirm-password'].value;
-        const dataConsentChecked = form['data-consent'].checked;
-        const signupErrorEl = document.getElementById('signup-error');
-        if (signupErrorEl) signupErrorEl.textContent = '';
-        if (!nombre || !apellidos || !cedula) {
-            if (signupErrorEl) signupErrorEl.textContent = "Nombre, apellidos y cédula son obligatorios.";
-            return;
-        }
-        if (password !== confirmPassword) {
-            if (signupErrorEl) signupErrorEl.textContent = "Las contraseñas no coinciden.";
-            return;
-        }
-        const passwordMinLength = 12;
-        const requiredSymbols = /[&%#"]/;
-        let passwordErrorMessage = "";
-        if (password.length < passwordMinLength) {
-            passwordErrorMessage += `La contraseña debe tener al menos ${passwordMinLength} caracteres. `;
-        }
-        if (!requiredSymbols.test(password)) {
-            passwordErrorMessage += 'La contraseña debe incluir al menos uno de los siguientes símbolos: & % # "';
-        }
-        if (passwordErrorMessage) {
-            if (signupErrorEl) signupErrorEl.textContent = passwordErrorMessage.trim();
-            return;
-        }
-        if (!dataConsentChecked) {
-            if (signupErrorEl) signupErrorEl.textContent = "Debe aceptar la política de tratamiento de datos para registrarse.";
-            return;
-        }
-        const submitButton = form.querySelector('button[type="submit"]');
-        const originalButtonText = submitButton.textContent;
-        submitButton.disabled = true;
-        submitButton.textContent = "Registrando...";
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = e.target['login-email'].value;
+        const password = e.target['login-password'].value;
+        const loginErrorEl = document.getElementById('login-error');
+        if (loginErrorEl) loginErrorEl.textContent = '';
         try {
-            const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-            const user = userCredential.user;
-            await db.collection("users").doc(user.uid).set({
-                uid: user.uid,
-                email: user.email,
-                nombre: nombre,
-                apellidos: apellidos,
-                cedula: cedula,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                isApproved: false,
-                roles: ['espectador'],
-                dataConsentGiven: true
-            });
+            await auth.signInWithEmailAndPassword(email, password);
         } catch (error) {
-            if (signupErrorEl) signupErrorEl.textContent = getFirebaseAuthErrorMessage(error);
-            submitButton.disabled = false;
-            submitButton.textContent = originalButtonText;
+            if (loginErrorEl) loginErrorEl.textContent = getFirebaseAuthErrorMessage(error);
+        }
+    });
+}
+
+function renderSignupForm() {
+    if (!loginFormContainer) return;
+    if (authTitle) authTitle.textContent = 'Crear Nueva Cuenta';
+    loginFormContainer.innerHTML = `
+        <form id="signup-form" class="space-y-3">
+            <div><label for="signup-nombre" class="block text-sm font-medium text-nova-gray-dark">Nombre(s)</label><input type="text" id="signup-nombre" name="nombre" required autocomplete="given-name" class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"></div>
+            <div><label for="signup-apellidos" class="block text-sm font-medium text-nova-gray-dark">Apellidos</label><input type="text" id="signup-apellidos" name="apellidos" required autocomplete="family-name" class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"></div>
+            <div><label for="signup-cedula" class="block text-sm font-medium text-nova-gray-dark">Número de Cédula</label><input type="text" id="signup-cedula" name="cedula" required class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"></div>
+            <div><label for="signup-email" class="block text-sm font-medium text-nova-gray-dark">Correo Electrónico</label><input type="email" id="signup-email" name="email" required autocomplete="email" class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"></div>
+            <div><label for="signup-password" class="block text-sm font-medium text-nova-gray-dark">Contraseña</label><input type="password" id="signup-password" name="password" required autocomplete="new-password" class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"></div>
+            <div><label for="signup-confirm-password" class="block text-sm font-medium text-nova-gray-dark">Confirmar Contraseña</label><input type="password" id="signup-confirm-password" name="confirm-password" required autocomplete="new-password" class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"></div>
+            <div class="text-xs text-nova-gray-dark">La contraseña debe tener al menos 12 caracteres e incluir al menos uno de los siguientes símbolos: & % # "</div>
+            <div class="pt-2 flex items-start"><div class="flex items-center h-5"><input id="data-consent" name="dataConsent" type="checkbox" required class="focus:ring-nova-green h-4 w-4 text-nova-green border-gray-300 rounded"></div><div class="ml-3 text-sm"><label for="data-consent" class="font-medium text-nova-gray-dark">Acepto que mis datos sean tratados de acuerdo con la Ley de Protección de Datos de Colombia (Ley 1581 de 2012) y la Política de Tratamiento de Datos de Nova Urbano.</label></div></div>
+            
+            <div class="text-center my-4 p-3 bg-gray-50 rounded-md border">
+                <p class="text-sm font-medium text-nova-gray-dark mb-2">Verificación de Seguridad</p>
+                <div id="signup-turnstile-container" class="flex justify-center"></div>
+                <p class="text-xs text-nova-gray mt-2">Realice la verificación para poder registrarse.</p>
+            </div>
+            <div class="pt-2">
+                <button type="submit" id="signup-submit-button" disabled class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-nova-green hover:bg-nova-green-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nova-green-dark transition-colors duration-150 disabled:bg-nova-gray disabled:cursor-not-allowed">
+                    Registrarse
+                </button>
+            </div>
+        </form>
+        <p id="signup-error" class="mt-2 text-center text-sm text-red-600"></p>
+    `;
+
+    if (registrationArea) {
+        registrationArea.innerHTML = `<p class="text-sm text-nova-gray-dark">¿Ya tienes cuenta? <a href="#" id="show-login-link" class="font-medium text-nova-green hover:text-nova-green-dark">Inicia sesión aquí</a></p>`;
+        document.getElementById('show-login-link').addEventListener('click', (e) => {
+            e.preventDefault();
+            renderLoginForm();
+        });
+    }
+    
+    function renderWidget() {
+        if (typeof turnstile !== 'undefined') {
+            turnstile.render('#signup-turnstile-container', {
+                 // FIXED: Placeholder now uses double quotes to match the build script
+                sitekey: "%TURNSTILE_SITEKEY%",
+                language: 'es',
+                theme: 'dark',
+                callback: function(token) {
+                    const button = document.getElementById('signup-submit-button');
+                    if(button) {
+                       button.disabled = false;
+                    }
+                },
+            });
         }
     }
+
+    if (window.turnstileLoaded) {
+        renderWidget();
+    } else {
+        const interval = setInterval(() => {
+            if (window.turnstileLoaded) {
+                renderWidget();
+                clearInterval(interval);
+            }
+        }, 100);
+    }
+
+    document.getElementById('signup-form').addEventListener('submit', handleSignupSubmit);
+}
 
     function getFirebaseAuthErrorMessage(error) {
         switch (error.code) {
@@ -674,184 +693,214 @@ auth.onAuthStateChanged(async user => {
     }
 
     async function loadInventoryItems(siteId, siteName) {
-        if (!inventoryListContainer) {
-            return;
-        }
-        // Switched to table view
-        inventoryListContainer.innerHTML = `
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ítem</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unidad</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Serial/Modelo</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                        <th scope="col" class="relative px-6 py-3"><span class="sr-only">Acciones</span></th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    <tr><td colspan="6" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Cargando inventario para ${siteName}...</td></tr>
-                </tbody>
-            </table>`;
+    // Set up the static table structure first
+    inventoryListContainer.innerHTML = `
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sortable-header" data-sort="itemName" style="cursor: pointer;">Ítem <span class="sort-indicator"></span></th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sortable-header" data-sort="quantity" style="cursor: pointer;">Cantidad <span class="sort-indicator"></span></th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unidad</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Serial/Modelo</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sortable-header" data-sort="condition" style="cursor: pointer;">Estado <span class="sort-indicator"></span></th>
+                    <th scope="col" class="relative px-6 py-3"><span class="sr-only">Acciones</span></th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                <tr><td colspan="6" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Cargando inventario para ${siteName}...</td></tr>
+            </tbody>
+        </table>`;
 
-        const tableBody = inventoryListContainer.querySelector('tbody');
-        if (!tableBody) return;
+    // Attach click listeners to the newly created headers
+    document.querySelectorAll('.sortable-header').forEach(header => {
+        header.addEventListener('click', () => {
+            sortInventory(header.dataset.sort);
+        });
+    });
 
-        const user = auth.currentUser;
-        if (!user) {
-            tableBody.innerHTML = '<tr><td colspan="6" class="px-6 py-4 whitespace-nowrap text-sm text-red-500">Error: Usuario no autenticado.</td></tr>';
-            return;
-        }
+    const tableBody = inventoryListContainer.querySelector('tbody');
+    const user = auth.currentUser;
+    if (!user) {
+        tableBody.innerHTML = '<tr><td colspan="6" class="px-6 py-4 whitespace-nowrap text-sm text-red-500">Error: Usuario no autenticado.</td></tr>';
+        return;
+    }
 
-        try {
-            const inventorySnapshot = await db.collection("inventoryItems")
-                .where("siteId", "==", siteId)
-                .orderBy("itemName", "asc")
-                .get();
+    try {
+        const inventorySnapshot = await db.collection("inventoryItems")
+            .where("siteId", "==", siteId)
+            .get();
 
-            let itemsHTML = '';
-            let itemsToDisplay = 0;
+        // Clear previous cache and reset sorting state for the new site
+        currentInventoryCache = [];
+        sortColumn = 'itemName';
+        sortDirection = 'asc';
 
-            inventorySnapshot.forEach(doc => {
-                const item = doc.data();
-                const itemId = doc.id;
+        inventorySnapshot.forEach(doc => {
+            currentInventoryCache.push({ id: doc.id, ...doc.data() });
+        });
+        
+        // Perform the initial sort by the default column (itemName)
+        sortInventory(sortColumn, true);
 
-                if (item.quantity === 0 && !showZeroQuantityItems) {
-                    return;
-                }
-                itemsToDisplay++;
-
-                const escapedItemName = item.itemName ? item.itemName.replace(/[&<>"']/g, char => ({
-                    '&': '&amp;',
-                    '<': '&lt;',
-                    '>': '&gt;',
-                    '"': '&quot;',
-                    "'": '&#39;'
-                } [char])) : 'Ítem sin nombre';
-                const escapedUnit = item.unit ? item.unit.replace(/[&<>"']/g, char => ({
-                    '&': '&amp;',
-                    '<': '&lt;',
-                    '>': '&gt;',
-                    '"': '&quot;',
-                    "'": '&#39;'
-                } [char])) : '';
-                const escapedSerialModel = item.serialModel ? item.serialModel.replace(/[&<>"']/g, char => ({
-                    '&': '&amp;',
-                    '<': '&lt;',
-                    '>': '&gt;',
-                    '"': '&quot;',
-                    "'": '&#39;'
-                } [char])) : 'N/A';
-                const escapedCondition = item.condition ? item.condition.replace(/[&<>"']/g, char => ({
-                    '&': '&amp;',
-                    '<': '&lt;',
-                    '>': '&gt;',
-                    '"': '&quot;',
-                    "'": '&#39;'
-                } [char])) : 'N/A';
-                const zeroQtyClass = item.quantity === 0 ? 'opacity-60' : '';
-
-                itemsHTML += `
-                    <tr class="${zeroQtyClass}" data-item-id="${itemId}">
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm font-medium text-gray-900">${escapedItemName}</div>
-                            <div class="text-xs text-gray-500">NUI: ${item.nui || 'N/A'}</div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.quantity !== undefined ? item.quantity : 'N/A'}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${escapedUnit}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${escapedSerialModel}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${escapedCondition}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <div class="flex space-x-2">
-                                ${currentUserRole === 'oficina' ? `
-                                    <button class="edit-item-btn text-xs bg-blue-500 hover:bg-blue-600 text-white py-1 px-2 rounded" data-item-id="${itemId}" data-site-id="${siteId}" data-site-name="${siteName}">Editar</button>
-                                    <button class="adjust-quantity-btn text-xs bg-green-500 hover:bg-green-600 text-white py-1 px-2 rounded" data-item-id="${itemId}" data-site-id="${siteId}" data-site-name="${siteName}" data-item-name="${escapedItemName}" data-current-quantity="${item.quantity}">Ajustar Cant.</button>
-                                    <button class="transfer-item-btn text-xs bg-yellow-500 hover:bg-yellow-600 text-black py-1 px-2 rounded" data-item-id="${itemId}" data-site-id="${siteId}" data-site-name="${siteName}">Transferir</button>
-                                ` : ''}
-                                <button class="view-history-btn text-xs bg-gray-400 hover:bg-gray-500 text-white py-1 px-2 rounded" data-item-id="${itemId}" data-item-name="${escapedItemName}">Historial</button>
-                                <button class="maintenance-log-btn text-xs bg-orange-500 hover:bg-orange-600 text-white py-1 px-2 rounded" data-item-id="${itemId}" data-item-name="${escapedItemName}" data-site-id="${siteId}" data-site-name="${siteName}">Bitácora</button>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            });
-
-            if (inventorySnapshot.empty || itemsToDisplay === 0) {
-                let noItemsMessage = `<tr><td colspan="6" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">No hay ítems de inventario para esta ubicación (${siteName}).</td></tr>`;
-                if (!inventorySnapshot.empty && itemsToDisplay === 0) {
-                    noItemsMessage = `<tr><td colspan="6" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Todos los ítems tienen cantidad cero. Active "Mostrar ítems sin stock" para verlos.</td></tr>`;
-                }
-                tableBody.innerHTML = noItemsMessage;
-            } else {
-                tableBody.innerHTML = itemsHTML;
-            }
-
-            // Re-attach event listeners
-            if (currentUserRole === 'oficina') {
-                document.querySelectorAll('.edit-item-btn').forEach(button => {
-                    button.addEventListener('click', async (e) => {
-                        const itemId = e.target.dataset.itemId;
-                        const siteId = e.target.dataset.siteId;
-                        const siteName = e.target.dataset.siteName;
-                        try {
-                            const itemDoc = await db.collection("inventoryItems").doc(itemId).get();
-                            if (itemDoc.exists) renderEditItemForm(itemId, itemDoc.data(), siteId, siteName);
-                            else alert("Error: Ítem no encontrado.");
-                        } catch (error) {
-                            alert("Error al cargar datos del ítem para editar.");
-                        }
-                    });
-                });
-                document.querySelectorAll('.adjust-quantity-btn').forEach(button => {
-                    button.addEventListener('click', (e) => {
-                        const itemId = e.target.dataset.itemId;
-                        const siteId = e.target.dataset.siteId;
-                        const siteName = e.target.dataset.siteName;
-                        const itemName = e.target.dataset.itemName;
-                        const currentQuantity = parseFloat(e.target.dataset.currentQuantity);
-                        renderAdjustQuantityForm(itemId, itemName, currentQuantity, siteId, siteName);
-                    });
-                });
-                document.querySelectorAll('.transfer-item-btn').forEach(button => {
-                    button.addEventListener('click', async (e) => {
-                        const itemId = e.target.dataset.itemId;
-                        const siteId = e.target.dataset.siteId;
-                        const siteName = e.target.dataset.siteName;
-                        try {
-                            const itemDoc = await db.collection("inventoryItems").doc(itemId).get();
-                            if (itemDoc.exists) renderTransferItemForm(itemId, itemDoc.data(), siteId, siteName);
-                            else alert("Error: Ítem no encontrado.");
-                        } catch (error) {
-                            alert("Error al cargar datos del ítem para transferir.");
-                        }
-                    });
-                });
-            }
-            document.querySelectorAll('.view-history-btn').forEach(button => {
-                button.addEventListener('click', (e) => {
-                    const itemId = e.target.dataset.itemId;
-                    const itemName = e.target.dataset.itemName;
-                    showItemHistory(itemId, itemName);
-                });
-            });
-
-            document.querySelectorAll('.maintenance-log-btn').forEach(button => {
-                button.addEventListener('click', (e) => {
-                    const itemId = e.target.dataset.itemId;
-                    const itemName = e.target.dataset.itemName;
-                    const siteId = e.target.dataset.siteId;
-                    const siteName = e.target.dataset.siteName;
-                    showMaintenanceLog(itemId, itemName, siteId, siteName);
-                });
-            });
-        } catch (error) {
-            tableBody.innerHTML = `<tr><td colspan="6" class="px-6 py-4 whitespace-nowrap text-sm text-red-500">Error al cargar el inventario: ${error.message}.</td></tr>`;
-            if (error.message.includes("index")) {
-                tableBody.innerHTML += `<tr><td colspan="6" class="px-6 py-4 whitespace-nowrap text-sm text-red-400">Es posible que necesite crear un índice compuesto en Firestore.</td></tr>`;
-            }
+    } catch (error) {
+        tableBody.innerHTML = `<tr><td colspan="6" class="px-6 py-4 whitespace-nowrap text-sm text-red-500">Error al cargar el inventario: ${error.message}.</td></tr>`;
+        if (error.message.includes("index")) {
+            tableBody.innerHTML += `<tr><td colspan="6" class="px-6 py-4 whitespace-nowrap text-sm text-red-400">Es posible que necesite crear un índice compuesto en Firestore.</td></tr>`;
         }
     }
+}
+
+
+/**
+ * NEW function to handle sorting the cached data.
+ */
+function sortInventory(column, initializing = false) {
+    if (!initializing) {
+        if (column === sortColumn) {
+            sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            sortColumn = column;
+            sortDirection = 'asc';
+        }
+    }
+
+    currentInventoryCache.sort((a, b) => {
+        let valA, valB;
+
+        if (sortColumn === 'quantity') {
+            valA = a.quantity !== undefined ? a.quantity : -1;
+            valB = b.quantity !== undefined ? b.quantity : -1;
+        } else {
+            valA = (a[sortColumn] || '').toLowerCase();
+            valB = (b[sortColumn] || '').toLowerCase();
+        }
+
+        let comparison = 0;
+        if (valA > valB) comparison = 1;
+        else if (valA < valB) comparison = -1;
+
+        return sortDirection === 'asc' ? comparison : comparison * -1;
+    });
+
+    renderInventoryTable(currentInventoryCache);
+}
+
+
+/**
+ * NEW function that only renders the table from the cached data.
+ */
+function renderInventoryTable(items) {
+    const tableBody = inventoryListContainer.querySelector('tbody');
+    if (!tableBody) return;
+
+    document.querySelectorAll('.sort-indicator').forEach(el => el.textContent = '');
+    const activeHeader = document.querySelector(`.sortable-header[data-sort="${sortColumn}"] .sort-indicator`);
+    if (activeHeader) {
+        activeHeader.textContent = sortDirection === 'asc' ? ' ▲' : ' ▼';
+    }
+
+    const itemsToDisplay = items.filter(item => showZeroQuantityItems || item.quantity > 0);
+
+    if (itemsToDisplay.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="6" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">No hay ítems para mostrar.</td></tr>`;
+        return;
+    }
+
+    const siteName = inventorySection.dataset.currentSiteName;
+    const itemsHTML = itemsToDisplay.map(item => {
+        const escapedItemName = item.itemName ? item.itemName.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])) : 'Ítem sin nombre';
+        const escapedUnit = item.unit ? item.unit.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])) : '';
+        const escapedSerialModel = item.serialModel ? item.serialModel.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])) : 'N/A';
+        const escapedCondition = item.condition ? item.condition.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])) : 'N/A';
+        const zeroQtyClass = item.quantity === 0 ? 'opacity-60' : '';
+
+        return `
+            <tr class="${zeroQtyClass}" data-item-id="${item.id}">
+                <td class="px-6 py-4 whitespace-nowrap"><div class="text-sm font-medium text-gray-900">${escapedItemName}</div><div class="text-xs text-gray-500">NUI: ${item.nui || 'N/A'}</div></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.quantity !== undefined ? item.quantity : 'N/A'}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${escapedUnit}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${escapedSerialModel}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${escapedCondition}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <div class="flex space-x-2">
+                        ${currentUserRole === 'oficina' ? `
+                            <button class="edit-item-btn text-xs bg-blue-500 hover:bg-blue-600 text-white py-1 px-2 rounded" data-item-id="${item.id}" data-site-id="${item.siteId}" data-site-name="${siteName}">Editar</button>
+                            <button class="adjust-quantity-btn text-xs bg-green-500 hover:bg-green-600 text-white py-1 px-2 rounded" data-item-id="${item.id}" data-site-id="${item.siteId}" data-site-name="${siteName}" data-item-name="${escapedItemName}" data-current-quantity="${item.quantity}">Ajustar Cant.</button>
+                            <button class="transfer-item-btn text-xs bg-yellow-500 hover:bg-yellow-600 text-black py-1 px-2 rounded" data-item-id="${item.id}" data-site-id="${item.siteId}" data-site-name="${siteName}">Transferir</button>
+                        ` : ''}
+                        <button class="view-history-btn text-xs bg-gray-400 hover:bg-gray-500 text-white py-1 px-2 rounded" data-item-id="${item.id}" data-item-name="${escapedItemName}">Historial</button>
+                        <button class="maintenance-log-btn text-xs bg-orange-500 hover:bg-orange-600 text-white py-1 px-2 rounded" data-item-id="${item.id}" data-item-name="${escapedItemName}" data-site-id="${item.siteId}" data-site-name="${siteName}">Bitácora</button>
+                    </div>
+                </td>
+            </tr>`;
+    }).join('');
+
+    tableBody.innerHTML = itemsHTML;
+    attachInventoryButtonListeners();
+}
+
+
+/**
+ * NEW function to centralize attaching listeners to the dynamic buttons in the table.
+ */
+function attachInventoryButtonListeners() {
+    if (currentUserRole === 'oficina') {
+        document.querySelectorAll('.edit-item-btn').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const itemId = e.target.dataset.itemId;
+                const siteId = e.target.dataset.siteId;
+                const siteName = e.target.dataset.siteName;
+                try {
+                    const itemDoc = await db.collection("inventoryItems").doc(itemId).get();
+                    if (itemDoc.exists) renderEditItemForm(itemId, itemDoc.data(), siteId, siteName);
+                    else alert("Error: Ítem no encontrado.");
+                } catch (error) {
+                    alert("Error al cargar datos del ítem para editar.");
+                }
+            });
+        });
+        document.querySelectorAll('.adjust-quantity-btn').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const itemId = e.target.dataset.itemId;
+                const siteId = e.target.dataset.siteId;
+                const siteName = e.target.dataset.siteName;
+                const itemName = e.target.dataset.itemName;
+                const currentQuantity = parseFloat(e.target.dataset.currentQuantity);
+                renderAdjustQuantityForm(itemId, itemName, currentQuantity, siteId, siteName);
+            });
+        });
+        document.querySelectorAll('.transfer-item-btn').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const itemId = e.target.dataset.itemId;
+                const siteId = e.target.dataset.siteId;
+                const siteName = e.target.dataset.siteName;
+                try {
+                    const itemDoc = await db.collection("inventoryItems").doc(itemId).get();
+                    if (itemDoc.exists) renderTransferItemForm(itemId, itemDoc.data(), siteId, siteName);
+                    else alert("Error: Ítem no encontrado.");
+                } catch (error) {
+                    alert("Error al cargar datos del ítem para transferir.");
+                }
+            });
+        });
+    }
+    document.querySelectorAll('.view-history-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+            const itemId = e.target.dataset.itemId;
+            const itemName = e.target.dataset.itemName;
+            showItemHistory(itemId, itemName);
+        });
+    });
+    document.querySelectorAll('.maintenance-log-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+            const itemId = e.target.dataset.itemId;
+            const itemName = e.target.dataset.itemName;
+            const siteId = e.target.dataset.siteId;
+            const siteName = e.target.dataset.siteName;
+            showMaintenanceLog(itemId, itemName, siteId, siteName);
+        });
+    });
+}
 
     async function exportInventoryToCsv() {
     const siteId = inventorySection.dataset.currentSiteId;
@@ -873,6 +922,15 @@ auth.onAuthStateChanged(async user => {
             return;
         }
 
+        // --- NEW: Filter out items with zero quantity ---
+        const itemsToExport = inventorySnapshot.docs.filter(doc => doc.data().quantity > 0);
+
+        // --- NEW: Check if there's anything left to export ---
+        if (itemsToExport.length === 0) {
+            alert(`No hay ítems con stock disponible para exportar en ${siteName}.`);
+            return;
+        }
+
         const headers = [
             "NUI",
             "Nombre del Ítem",
@@ -885,23 +943,18 @@ auth.onAuthStateChanged(async user => {
             "Última Actualización"
         ];
 
-        // --- INICIO DE LA SECCIÓN MEJORADA ---
-
-        // Función auxiliar para formatear cada campo de forma segura para CSV
         const toCsvField = (value) => {
             const stringValue = String(value === undefined || value === null ? '' : value);
-            // Si el valor contiene comas, comillas o saltos de línea, lo encapsulamos entre comillas dobles.
-            // También, duplicamos cualquier comilla doble que ya exista dentro del valor.
             if (/[",\n\r]/.test(stringValue)) {
                 return `"${stringValue.replace(/"/g, '""')}"`;
             }
             return stringValue;
         };
 
-        const rows = inventorySnapshot.docs.map(doc => {
+        // --- MODIFIED: Map over the filtered 'itemsToExport' array ---
+        const rows = itemsToExport.map(doc => {
             const item = doc.data();
             
-            // 1. Formatear la fecha a un estándar sin comas (YYYY-MM-DD HH:MM:SS)
             let lastUpdated = 'N/A';
             if (item.lastUpdatedAt && item.lastUpdatedAt.toDate) {
                 const d = item.lastUpdatedAt.toDate();
@@ -909,24 +962,20 @@ auth.onAuthStateChanged(async user => {
                 lastUpdated = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
             }
             
-            // 2. Mapear los datos a un array
             const rowData = [
                 item.nui,
                 item.itemName,
                 item.quantity,
                 item.unit,
                 item.serialModel,
-                item.condition, // Este es el campo que daba problemas
+                item.condition,
                 item.description,
                 item.status,
                 lastUpdated
             ];
 
-            // 3. Aplicar el formato seguro a cada campo y luego unirlos
             return rowData.map(toCsvField).join(',');
         });
-
-        // --- FIN DE LA SECCIÓN MEJORADA ---
 
         const csvContent = [headers.join(','), ...rows].join('\n');
         const bom = new Uint8Array([0xEF, 0xBB, 0xBF]); 
@@ -1429,76 +1478,82 @@ auth.onAuthStateChanged(async user => {
     }
 
     async function handleAdjustQuantitySubmit(event, itemId, oldQuantity, siteId, siteName, itemName) {
-        event.preventDefault();
-        if (currentUserRole !== 'oficina') return;
-        const form = event.target;
-        const newQuantityStr = form.elements['newItemQuantity'].value;
-        const reason = form.elements['adjustmentReason'].value.trim();
-        const errorElement = document.getElementById('adjust-quantity-error');
-        if (errorElement) errorElement.textContent = '';
-        if (!newQuantityStr || !reason) {
-            if (errorElement) errorElement.textContent = 'La nueva cantidad y el motivo son obligatorios.';
-            return;
-        }
-        const newQuantity = parseFloat(newQuantityStr);
-        if (isNaN(newQuantity) || newQuantity < 0) {
-            if (errorElement) errorElement.textContent = 'La nueva cantidad debe ser un número válido y no negativo.';
-            return;
-        }
-        if (newQuantity === oldQuantity) {
-            if (errorElement) errorElement.textContent = 'La nueva cantidad es igual a la actual. No se realizaron cambios.';
-            return;
-        }
-        const user = auth.currentUser;
-        if (!user) {
-            if (errorElement) errorElement.textContent = 'Error de autenticación.';
-            return;
-        }
-        const submitButton = form.querySelector('button[type="submit"]');
-        const originalButtonText = submitButton.textContent;
-        submitButton.disabled = true;
-        submitButton.textContent = 'Ajustando...';
-        try {
-            let performingUserName = "Usuario Desconocido",
-                performingUserApellidos = "",
-                performingUserCedula = "";
-            const userProfileRef = db.collection("users").doc(user.uid);
-            const userProfileSnap = await userProfileRef.get();
-            if (userProfileSnap.exists) {
-                const userProfileData = userProfileSnap.data();
-                performingUserName = userProfileData.nombre || performingUserName;
-                performingUserApellidos = userProfileData.apellidos || "";
-                performingUserCedula = userProfileData.cedula || "";
-            }
-            const itemRef = db.collection("inventoryItems").doc(itemId);
-            const timestamp = firebase.firestore.FieldValue.serverTimestamp();
-            await itemRef.update({
-                quantity: newQuantity,
-                lastUpdatedAt: timestamp
-            });
-            await itemRef.collection("history").add({
-                timestamp: timestamp,
-                userId: user.uid,
-                userName: performingUserName,
-                userApellidos: performingUserApellidos,
-                userCedula: performingUserCedula,
-                action: "CANTIDAD_AJUSTADA",
-                details: {
-                    oldQuantity: oldQuantity,
-                    newQuantity: newQuantity,
-                    adjustment: newQuantity - oldQuantity,
-                    reason: reason,
-                    notes: `Cantidad ajustada para "${itemName || 'ítem desconocido'}" en obra "${siteName}".`
-                }
-            });
-            if (adjustQuantityModal) adjustQuantityModal.classList.add('hidden');
-            loadInventoryItems(siteId, siteName);
-        } catch (error) {
-            if (errorElement) errorElement.textContent = `Error al ajustar cantidad: ${error.message}`;
-            submitButton.disabled = false;
-            submitButton.textContent = originalButtonText;
-        }
+    event.preventDefault(); //
+    if (currentUserRole !== 'oficina') return; //
+
+    const form = event.target; //
+    const newQuantityStr = form.elements['newItemQuantity'].value; //
+    const reason = form.elements['adjustmentReason'].value.trim(); //
+    const errorElement = document.getElementById('adjust-quantity-error'); //
+    if (errorElement) errorElement.textContent = ''; //
+
+    if (!newQuantityStr || !reason) {
+        if (errorElement) errorElement.textContent = 'La nueva cantidad y el motivo son obligatorios.'; //
+        return; //
     }
+    const newQuantity = parseFloat(newQuantityStr); //
+    if (isNaN(newQuantity) || newQuantity < 0) {
+        if (errorElement) errorElement.textContent = 'La nueva cantidad debe ser un número válido y no negativo.'; //
+        return; //
+    }
+    if (newQuantity === oldQuantity) {
+        if (errorElement) errorElement.textContent = 'La nueva cantidad es igual a la actual. No se realizaron cambios.'; //
+        return; //
+    }
+    const user = auth.currentUser; //
+    if (!user) {
+        if (errorElement) errorElement.textContent = 'Error de autenticación.'; //
+        return; //
+    }
+
+    const submitButton = form.querySelector('button[type="submit"]'); //
+    const originalButtonText = submitButton.textContent; //
+    submitButton.disabled = true; //
+    submitButton.textContent = 'Ajustando...'; //
+
+    try {
+        let performingUserName = "Usuario Desconocido", //
+            performingUserApellidos = "", //
+            performingUserCedula = ""; //
+        const userProfileRef = db.collection("users").doc(user.uid); //
+        const userProfileSnap = await userProfileRef.get(); //
+        if (userProfileSnap.exists) {
+            const userProfileData = userProfileSnap.data(); //
+            performingUserName = userProfileData.nombre || performingUserName; //
+            performingUserApellidos = userProfileData.apellidos || ""; //
+            performingUserCedula = userProfileData.cedula || ""; //
+        }
+        const itemRef = db.collection("inventoryItems").doc(itemId); //
+        const timestamp = firebase.firestore.FieldValue.serverTimestamp(); //
+        await itemRef.update({
+            quantity: newQuantity, //
+            lastUpdatedAt: timestamp //
+        }); //
+        await itemRef.collection("history").add({
+            timestamp: timestamp, //
+            userId: user.uid, //
+            userName: performingUserName, //
+            userApellidos: performingUserApellidos, //
+            userCedula: performingUserCedula, //
+            action: "CANTIDAD_AJUSTADA", //
+            details: {
+                oldQuantity: oldQuantity, //
+                newQuantity: newQuantity, //
+                adjustment: newQuantity - oldQuantity, //
+                reason: reason, //
+                notes: `Cantidad ajustada para "${itemName || 'ítem desconocido'}" en obra "${siteName}".` //
+            }
+        }); //
+        if (adjustQuantityModal) adjustQuantityModal.classList.add('hidden'); //
+        loadInventoryItems(siteId, siteName); //
+    } catch (error) {
+        if (errorElement) errorElement.textContent = `Error al ajustar cantidad: ${error.message}`; //
+    } finally {
+        // This block ensures the button always resets after the operation.
+        submitButton.disabled = false; //
+        submitButton.textContent = originalButtonText; //
+    }
+}
 
     async function showItemHistory(itemId, itemName) {
         if (!historyModal || !historyModalTitle || !historyModalContent) {
@@ -2291,6 +2346,31 @@ auth.onAuthStateChanged(async user => {
     if (addMaintenanceModal) {
         addMaintenanceModal.addEventListener('click', e => { 
             if (e.target === addMaintenanceModal) addMaintenanceModal.classList.add('hidden'); 
+        });
+    }
+
+    const localInventoryFilter = document.getElementById('local-inventory-filter');
+
+    if (localInventoryFilter) {
+        localInventoryFilter.addEventListener('keyup', () => {
+            const query = localInventoryFilter.value.toLowerCase().trim();
+
+            // If the filter is empty, show all items from the cache
+            if (!query) {
+                renderInventoryTable(currentInventoryCache);
+                return;
+            }
+
+            // Otherwise, filter the main cache
+            const filteredItems = currentInventoryCache.filter(item => {
+                const nameMatch = item.itemName?.toLowerCase().includes(query);
+                const serialMatch = item.serialModel?.toLowerCase().includes(query);
+                const nuiMatch = item.nui?.toLowerCase().includes(query);
+                return nameMatch || serialMatch || nuiMatch;
+            });
+
+            // Render the table with only the filtered items
+            renderInventoryTable(filteredItems);
         });
     }
 
