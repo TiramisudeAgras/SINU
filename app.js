@@ -816,7 +816,11 @@ function renderInventoryTable(items) {
 
         return `
             <tr class="${zeroQtyClass}" data-item-id="${item.id}">
-                <td class="px-6 py-4 whitespace-nowrap"><div class="text-sm font-medium text-gray-900">${escapedItemName}</div><div class="text-xs text-gray-500">NUI: ${item.nui || 'N/A'}</div></td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm font-medium text-gray-900">${escapedItemName}</div>
+                    <div class="text-xs text-gray-500">NUI: ${item.nui || 'N/A'}</div>
+                    ${item.description ? `<div class="text-xs text-blue-600 pt-1 italic">Obs: ${item.description.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}</div>` : ''}
+                </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.quantity !== undefined ? item.quantity : 'N/A'}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${escapedUnit}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${escapedSerialModel}</td>
