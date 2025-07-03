@@ -1444,76 +1444,82 @@ function renderSignupForm() {
     }
 
     async function handleAdjustQuantitySubmit(event, itemId, oldQuantity, siteId, siteName, itemName) {
-        event.preventDefault();
-        if (currentUserRole !== 'oficina') return;
-        const form = event.target;
-        const newQuantityStr = form.elements['newItemQuantity'].value;
-        const reason = form.elements['adjustmentReason'].value.trim();
-        const errorElement = document.getElementById('adjust-quantity-error');
-        if (errorElement) errorElement.textContent = '';
-        if (!newQuantityStr || !reason) {
-            if (errorElement) errorElement.textContent = 'La nueva cantidad y el motivo son obligatorios.';
-            return;
-        }
-        const newQuantity = parseFloat(newQuantityStr);
-        if (isNaN(newQuantity) || newQuantity < 0) {
-            if (errorElement) errorElement.textContent = 'La nueva cantidad debe ser un número válido y no negativo.';
-            return;
-        }
-        if (newQuantity === oldQuantity) {
-            if (errorElement) errorElement.textContent = 'La nueva cantidad es igual a la actual. No se realizaron cambios.';
-            return;
-        }
-        const user = auth.currentUser;
-        if (!user) {
-            if (errorElement) errorElement.textContent = 'Error de autenticación.';
-            return;
-        }
-        const submitButton = form.querySelector('button[type="submit"]');
-        const originalButtonText = submitButton.textContent;
-        submitButton.disabled = true;
-        submitButton.textContent = 'Ajustando...';
-        try {
-            let performingUserName = "Usuario Desconocido",
-                performingUserApellidos = "",
-                performingUserCedula = "";
-            const userProfileRef = db.collection("users").doc(user.uid);
-            const userProfileSnap = await userProfileRef.get();
-            if (userProfileSnap.exists) {
-                const userProfileData = userProfileSnap.data();
-                performingUserName = userProfileData.nombre || performingUserName;
-                performingUserApellidos = userProfileData.apellidos || "";
-                performingUserCedula = userProfileData.cedula || "";
-            }
-            const itemRef = db.collection("inventoryItems").doc(itemId);
-            const timestamp = firebase.firestore.FieldValue.serverTimestamp();
-            await itemRef.update({
-                quantity: newQuantity,
-                lastUpdatedAt: timestamp
-            });
-            await itemRef.collection("history").add({
-                timestamp: timestamp,
-                userId: user.uid,
-                userName: performingUserName,
-                userApellidos: performingUserApellidos,
-                userCedula: performingUserCedula,
-                action: "CANTIDAD_AJUSTADA",
-                details: {
-                    oldQuantity: oldQuantity,
-                    newQuantity: newQuantity,
-                    adjustment: newQuantity - oldQuantity,
-                    reason: reason,
-                    notes: `Cantidad ajustada para "${itemName || 'ítem desconocido'}" en obra "${siteName}".`
-                }
-            });
-            if (adjustQuantityModal) adjustQuantityModal.classList.add('hidden');
-            loadInventoryItems(siteId, siteName);
-        } catch (error) {
-            if (errorElement) errorElement.textContent = `Error al ajustar cantidad: ${error.message}`;
-            submitButton.disabled = false;
-            submitButton.textContent = originalButtonText;
-        }
+    event.preventDefault(); //
+    if (currentUserRole !== 'oficina') return; //
+
+    const form = event.target; //
+    const newQuantityStr = form.elements['newItemQuantity'].value; //
+    const reason = form.elements['adjustmentReason'].value.trim(); //
+    const errorElement = document.getElementById('adjust-quantity-error'); //
+    if (errorElement) errorElement.textContent = ''; //
+
+    if (!newQuantityStr || !reason) {
+        if (errorElement) errorElement.textContent = 'La nueva cantidad y el motivo son obligatorios.'; //
+        return; //
     }
+    const newQuantity = parseFloat(newQuantityStr); //
+    if (isNaN(newQuantity) || newQuantity < 0) {
+        if (errorElement) errorElement.textContent = 'La nueva cantidad debe ser un número válido y no negativo.'; //
+        return; //
+    }
+    if (newQuantity === oldQuantity) {
+        if (errorElement) errorElement.textContent = 'La nueva cantidad es igual a la actual. No se realizaron cambios.'; //
+        return; //
+    }
+    const user = auth.currentUser; //
+    if (!user) {
+        if (errorElement) errorElement.textContent = 'Error de autenticación.'; //
+        return; //
+    }
+
+    const submitButton = form.querySelector('button[type="submit"]'); //
+    const originalButtonText = submitButton.textContent; //
+    submitButton.disabled = true; //
+    submitButton.textContent = 'Ajustando...'; //
+
+    try {
+        let performingUserName = "Usuario Desconocido", //
+            performingUserApellidos = "", //
+            performingUserCedula = ""; //
+        const userProfileRef = db.collection("users").doc(user.uid); //
+        const userProfileSnap = await userProfileRef.get(); //
+        if (userProfileSnap.exists) {
+            const userProfileData = userProfileSnap.data(); //
+            performingUserName = userProfileData.nombre || performingUserName; //
+            performingUserApellidos = userProfileData.apellidos || ""; //
+            performingUserCedula = userProfileData.cedula || ""; //
+        }
+        const itemRef = db.collection("inventoryItems").doc(itemId); //
+        const timestamp = firebase.firestore.FieldValue.serverTimestamp(); //
+        await itemRef.update({
+            quantity: newQuantity, //
+            lastUpdatedAt: timestamp //
+        }); //
+        await itemRef.collection("history").add({
+            timestamp: timestamp, //
+            userId: user.uid, //
+            userName: performingUserName, //
+            userApellidos: performingUserApellidos, //
+            userCedula: performingUserCedula, //
+            action: "CANTIDAD_AJUSTADA", //
+            details: {
+                oldQuantity: oldQuantity, //
+                newQuantity: newQuantity, //
+                adjustment: newQuantity - oldQuantity, //
+                reason: reason, //
+                notes: `Cantidad ajustada para "${itemName || 'ítem desconocido'}" en obra "${siteName}".` //
+            }
+        }); //
+        if (adjustQuantityModal) adjustQuantityModal.classList.add('hidden'); //
+        loadInventoryItems(siteId, siteName); //
+    } catch (error) {
+        if (errorElement) errorElement.textContent = `Error al ajustar cantidad: ${error.message}`; //
+    } finally {
+        // This block ensures the button always resets after the operation.
+        submitButton.disabled = false; //
+        submitButton.textContent = originalButtonText; //
+    }
+}
 
     async function showItemHistory(itemId, itemName) {
         if (!historyModal || !historyModalTitle || !historyModalContent) {
