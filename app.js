@@ -131,24 +131,31 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (searchInput) {
-        searchInput.addEventListener('keyup', (e) => {
-            const query = e.target.value.toLowerCase().trim();
-            
-            if (query.length < 3) {
-                searchResultsContainer.innerHTML = '';
-                return;
-            }
+    searchInput.addEventListener('keyup', (e) => {
+        const query = e.target.value.toLowerCase().trim();
+        
+        if (query.length < 3) {
+            searchResultsContainer.innerHTML = '';
+            return;
+        }
 
-            const results = allItemsCache.filter(item => {
-                const nameMatch = item.itemName?.toLowerCase().includes(query);
-                const serialMatch = item.serialModel?.toLowerCase().includes(query);
-                const nuiMatch = item.nui?.toLowerCase().includes(query);
-                return nameMatch || serialMatch || nuiMatch;
-            });
+        const results = allItemsCache.filter(item => {
+            // Condition 1: Check if the item's text matches the query
+            const nameMatch = item.itemName?.toLowerCase().includes(query);
+            const serialMatch = item.serialModel?.toLowerCase().includes(query);
+            const nuiMatch = item.nui?.toLowerCase().includes(query);
+            const hasTextMatch = nameMatch || serialMatch || nuiMatch;
 
-            displaySearchResults(results);
+            // Condition 2: Check if the item is in stock
+            const isInStock = item.quantity > 0;
+
+            // Return true only if both conditions are met
+            return hasTextMatch && isInStock;
         });
-    }
+
+        displaySearchResults(results);
+    });
+}
 
     function displaySearchResults(results) {
         if (!searchResultsContainer) return;
