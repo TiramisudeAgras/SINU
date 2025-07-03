@@ -323,70 +323,6 @@ auth.onAuthStateChanged(async user => {
 
     // --- Login/Signup Forms (No Changes) ---
     function renderLoginForm() {
-        if (!loginFormContainer) return;
-        if (authTitle) authTitle.textContent = 'Bienvenido';
-        loginFormContainer.innerHTML = `
-            <form id="login-form" class="space-y-6">
-                <div>
-                    <label for="login-email" class="block text-sm font-medium text-nova-gray-dark">Correo Electrónico</label>
-                    <input type="email" id="login-email" name="email" required autocomplete="email"
-                           class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
-                </div>
-                <div>
-                    <label for="login-password" class="block text-sm font-medium text-nova-gray-dark">Contraseña</label>
-                    <input type="password" id="login-password" name="password" required autocomplete="current-password"
-                           class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
-                </div>
-                
-                <div id="login-turnstile-container" class="my-4 flex justify-center"></div>
-
-                <div>
-                    <button type="submit" id="login-submit-button" disabled
-                            class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-nova-green hover:bg-nova-green-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nova-green-dark transition-colors duration-150 disabled:bg-nova-gray disabled:cursor-not-allowed">
-                        Iniciar Sesión
-                    </button>
-                </div>
-            </form>
-            <p id="login-error" class="mt-2 text-center text-sm text-red-600"></p>
-        `;
-
-        if (registrationArea) {
-            registrationArea.innerHTML = `
-                <p class="text-sm text-nova-gray-dark">¿No tienes cuenta?
-                    <a href="#" id="show-signup-link" class="font-medium text-nova-green hover:text-nova-green-dark">Regístrate aquí</a>
-                </p>
-            `;
-            document.getElementById('show-signup-link').addEventListener('click', (e) => {
-                e.preventDefault();
-                renderSignupForm();
-            });
-        }
-
-        // Render the Turnstile widget and enable the button on success
-        if (typeof turnstile !== 'undefined') {
-            turnstile.render('#login-turnstile-container', {
-                sitekey: '1x00000000000000000000AA', // Test key
-                callback: function(token) {
-                    document.getElementById('login-submit-button').disabled = false;
-                },
-            });
-        }
-
-        document.getElementById('login-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = e.target['login-email'].value;
-            const password = e.target['login-password'].value;
-            const loginErrorEl = document.getElementById('login-error');
-            if (loginErrorEl) loginErrorEl.textContent = '';
-            try {
-                await auth.signInWithEmailAndPassword(email, password);
-            } catch (error) {
-                if (loginErrorEl) loginErrorEl.textContent = getFirebaseAuthErrorMessage(error);
-            }
-        });
-    }
-
-    function renderLoginForm() {
     if (!loginFormContainer) return;
     if (authTitle) authTitle.textContent = 'Bienvenido';
     loginFormContainer.innerHTML = `
@@ -432,9 +368,10 @@ auth.onAuthStateChanged(async user => {
     function renderWidget() {
         if (typeof turnstile !== 'undefined') {
             turnstile.render('#login-turnstile-container', {
-                sitekey: '%TURNSTILE_SITEKEY%',
-                language: 'es', // Set to Spanish
-                theme: 'dark',   // Or 'dark'
+                // FIXED: Placeholder now uses double quotes to match the build script
+                sitekey: "%TURNSTILE_SITEKEY%",
+                language: 'es', 
+                theme: 'dark',
                 callback: function(token) {
                     const button = document.getElementById('login-submit-button');
                     if (button) {
@@ -509,9 +446,10 @@ function renderSignupForm() {
     function renderWidget() {
         if (typeof turnstile !== 'undefined') {
             turnstile.render('#signup-turnstile-container', {
-                sitekey: '%TURNSTILE_SITEKEY%',
-                language: 'es', // Set to Spanish
-                theme: 'dark',   // Or 'dark'
+                 // FIXED: Placeholder now uses double quotes to match the build script
+                sitekey: "%TURNSTILE_SITEKEY%",
+                language: 'es',
+                theme: 'dark',
                 callback: function(token) {
                     const button = document.getElementById('signup-submit-button');
                     if(button) {
