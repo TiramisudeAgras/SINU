@@ -337,134 +337,204 @@ auth.onAuthStateChanged(async user => {
                     <input type="password" id="login-password" name="password" required autocomplete="current-password"
                            class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
                 </div>
+                
+                <div id="login-turnstile-container" class="my-4 flex justify-center"></div>
+
                 <div>
-                    <button type="submit"
-                            class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-nova-green hover:bg-nova-green-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nova-green-dark transition-colors duration-150">
+                    <button type="submit" id="login-submit-button" disabled
+                            class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-nova-green hover:bg-nova-green-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nova-green-dark transition-colors duration-150 disabled:bg-nova-gray disabled:cursor-not-allowed">
                         Iniciar Sesión
                     </button>
                 </div>
             </form>
             <p id="login-error" class="mt-2 text-center text-sm text-red-600"></p>
         `;
+
         if (registrationArea) {
             registrationArea.innerHTML = `
                 <p class="text-sm text-nova-gray-dark">¿No tienes cuenta?
                     <a href="#" id="show-signup-link" class="font-medium text-nova-green hover:text-nova-green-dark">Regístrate aquí</a>
                 </p>
             `;
-            const showSignupLink = document.getElementById('show-signup-link');
-            if (showSignupLink) {
-                showSignupLink.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    renderSignupForm();
-                });
+            document.getElementById('show-signup-link').addEventListener('click', (e) => {
+                e.preventDefault();
+                renderSignupForm();
+            });
+        }
+
+        // Render the Turnstile widget and enable the button on success
+        if (typeof turnstile !== 'undefined') {
+            turnstile.render('#login-turnstile-container', {
+                sitekey: '1x00000000000000000000AA', // Test key
+                callback: function(token) {
+                    document.getElementById('login-submit-button').disabled = false;
+                },
+            });
+        }
+
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = e.target['login-email'].value;
+            const password = e.target['login-password'].value;
+            const loginErrorEl = document.getElementById('login-error');
+            if (loginErrorEl) loginErrorEl.textContent = '';
+            try {
+                await auth.signInWithEmailAndPassword(email, password);
+            } catch (error) {
+                if (loginErrorEl) loginErrorEl.textContent = getFirebaseAuthErrorMessage(error);
             }
-        }
-        const loginForm = document.getElementById('login-form');
-        if (loginForm) {
-            loginForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const email = loginForm['login-email'].value;
-                const password = loginForm['login-password'].value;
-                const loginErrorEl = document.getElementById('login-error');
-                if (loginErrorEl) loginErrorEl.textContent = '';
-                try {
-                    await auth.signInWithEmailAndPassword(email, password);
-                } catch (error) {
-                    if (loginErrorEl) loginErrorEl.textContent = getFirebaseAuthErrorMessage(error);
-                }
-            });
-        }
+        });
     }
 
-    function renderSignupForm() {
-        if (!loginFormContainer) return;
-        if (authTitle) authTitle.textContent = 'Crear Nueva Cuenta';
-        loginFormContainer.innerHTML = `
-            <form id="signup-form" class="space-y-3">
-                <div><label for="signup-nombre" class="block text-sm font-medium text-nova-gray-dark">Nombre(s)</label><input type="text" id="signup-nombre" name="nombre" required autocomplete="given-name" class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"><p class="mt-1 text-xs text-nova-gray">Ej: Alonso</p></div>
-                <div><label for="signup-apellidos" class="block text-sm font-medium text-nova-gray-dark">Apellidos</label><input type="text" id="signup-apellidos" name="apellidos" required autocomplete="family-name" class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"><p class="mt-1 text-xs text-nova-gray">Ej: Quijano Saavedra</p></div>
-                <div><label for="signup-cedula" class="block text-sm font-medium text-nova-gray-dark">Número de Cédula</label><input type="text" id="signup-cedula" name="cedula" required class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"><p class="mt-1 text-xs text-nova-gray">Ej: 1234567890</p></div>
-                <div><label for="signup-email" class="block text-sm font-medium text-nova-gray-dark">Correo Electrónico</label><input type="email" id="signup-email" name="email" required autocomplete="email" class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"></div>
-                <div><label for="signup-password" class="block text-sm font-medium text-nova-gray-dark">Contraseña</label><input type="password" id="signup-password" name="password" required autocomplete="new-password" class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"></div>
-                <div><label for="signup-confirm-password" class="block text-sm font-medium text-nova-gray-dark">Confirmar Contraseña</label><input type="password" id="signup-confirm-password" name="confirm-password" required autocomplete="new-password" class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"></div>
-                <div class="text-xs text-nova-gray-dark">La contraseña debe tener al menos 12 caracteres e incluir al menos uno de los siguientes símbolos: & % # "</div>
-                <div class="pt-2 flex items-start"><div class="flex items-center h-5"><input id="data-consent" name="dataConsent" type="checkbox" required class="focus:ring-nova-green h-4 w-4 text-nova-green border-gray-300 rounded"></div><div class="ml-3 text-sm"><label for="data-consent" class="font-medium text-nova-gray-dark">Acepto que mis datos sean tratados de acuerdo con la Ley de Protección de Datos de Colombia (Ley 1581 de 2012) y la Política de Tratamiento de Datos de Nova Urbano.</label></div></div>
-                <div class="pt-2"><button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-nova-green hover:bg-nova-green-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nova-green-dark transition-colors duration-150">Registrarse</button></div>
-            </form>
-            <p id="signup-error" class="mt-2 text-center text-sm text-red-600"></p>
+    function renderLoginForm() {
+    if (!loginFormContainer) return;
+    if (authTitle) authTitle.textContent = 'Bienvenido';
+    loginFormContainer.innerHTML = `
+        <form id="login-form" class="space-y-6">
+            <div>
+                <label for="login-email" class="block text-sm font-medium text-nova-gray-dark">Correo Electrónico</label>
+                <input type="email" id="login-email" name="email" required autocomplete="email"
+                       class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
+            </div>
+            <div>
+                <label for="login-password" class="block text-sm font-medium text-nova-gray-dark">Contraseña</label>
+                <input type="password" id="login-password" name="password" required autocomplete="current-password"
+                       class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm">
+            </div>
+            
+            <div class="text-center my-4 p-3 bg-gray-50 rounded-md border">
+                <p class="text-sm font-medium text-nova-gray-dark mb-2">Verificación de Seguridad</p>
+                <div id="login-turnstile-container" class="flex justify-center"></div>
+                <p class="text-xs text-nova-gray mt-2">Por favor, complete este paso para continuar.</p>
+            </div>
+            <div>
+                <button type="submit" id="login-submit-button" disabled
+                        class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-nova-green hover:bg-nova-green-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nova-green-dark transition-colors duration-150 disabled:bg-nova-gray disabled:cursor-not-allowed">
+                    Iniciar Sesión
+                </button>
+            </div>
+        </form>
+        <p id="login-error" class="mt-2 text-center text-sm text-red-600"></p>
+    `;
+
+    if (registrationArea) {
+        registrationArea.innerHTML = `
+            <p class="text-sm text-nova-gray-dark">¿No tienes cuenta?
+                <a href="#" id="show-signup-link" class="font-medium text-nova-green hover:text-nova-green-dark">Regístrate aquí</a>
+            </p>
         `;
-        if (registrationArea) {
-            registrationArea.innerHTML = `<p class="text-sm text-nova-gray-dark">¿Ya tienes cuenta? <a href="#" id="show-login-link" class="font-medium text-nova-green hover:text-nova-green-dark">Inicia sesión aquí</a></p>`;
-            document.getElementById('show-login-link').addEventListener('click', (e) => {
-                e.preventDefault();
-                renderLoginForm();
-            });
-        }
-        document.getElementById('signup-form').addEventListener('submit', handleSignupSubmit);
+        document.getElementById('show-signup-link').addEventListener('click', (e) => {
+            e.preventDefault();
+            renderSignupForm();
+        });
     }
 
-    async function handleSignupSubmit(event) {
-        event.preventDefault();
-        const form = event.target;
-        const nombre = form['signup-nombre'].value.trim();
-        const apellidos = form['signup-apellidos'].value.trim();
-        const cedula = form['signup-cedula'].value.trim();
-        const email = form['signup-email'].value;
-        const password = form['signup-password'].value;
-        const confirmPassword = form['signup-confirm-password'].value;
-        const dataConsentChecked = form['data-consent'].checked;
-        const signupErrorEl = document.getElementById('signup-error');
-        if (signupErrorEl) signupErrorEl.textContent = '';
-        if (!nombre || !apellidos || !cedula) {
-            if (signupErrorEl) signupErrorEl.textContent = "Nombre, apellidos y cédula son obligatorios.";
-            return;
-        }
-        if (password !== confirmPassword) {
-            if (signupErrorEl) signupErrorEl.textContent = "Las contraseñas no coinciden.";
-            return;
-        }
-        const passwordMinLength = 12;
-        const requiredSymbols = /[&%#"]/;
-        let passwordErrorMessage = "";
-        if (password.length < passwordMinLength) {
-            passwordErrorMessage += `La contraseña debe tener al menos ${passwordMinLength} caracteres. `;
-        }
-        if (!requiredSymbols.test(password)) {
-            passwordErrorMessage += 'La contraseña debe incluir al menos uno de los siguientes símbolos: & % # "';
-        }
-        if (passwordErrorMessage) {
-            if (signupErrorEl) signupErrorEl.textContent = passwordErrorMessage.trim();
-            return;
-        }
-        if (!dataConsentChecked) {
-            if (signupErrorEl) signupErrorEl.textContent = "Debe aceptar la política de tratamiento de datos para registrarse.";
-            return;
-        }
-        const submitButton = form.querySelector('button[type="submit"]');
-        const originalButtonText = submitButton.textContent;
-        submitButton.disabled = true;
-        submitButton.textContent = "Registrando...";
-        try {
-            const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-            const user = userCredential.user;
-            await db.collection("users").doc(user.uid).set({
-                uid: user.uid,
-                email: user.email,
-                nombre: nombre,
-                apellidos: apellidos,
-                cedula: cedula,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                isApproved: false,
-                roles: ['espectador'],
-                dataConsentGiven: true
+    function renderWidget() {
+        if (typeof turnstile !== 'undefined') {
+            turnstile.render('#login-turnstile-container', {
+                sitekey: '%TURNSTILE_SITEKEY%',
+                language: 'es', // Set to Spanish
+                theme: 'dark',   // Or 'dark'
+                callback: function(token) {
+                    const button = document.getElementById('login-submit-button');
+                    if (button) {
+                        button.disabled = false;
+                    }
+                },
             });
-        } catch (error) {
-            if (signupErrorEl) signupErrorEl.textContent = getFirebaseAuthErrorMessage(error);
-            submitButton.disabled = false;
-            submitButton.textContent = originalButtonText;
         }
     }
+
+    if (window.turnstileLoaded) {
+        renderWidget();
+    } else {
+        const interval = setInterval(() => {
+            if (window.turnstileLoaded) {
+                renderWidget();
+                clearInterval(interval);
+            }
+        }, 100);
+    }
+
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = e.target['login-email'].value;
+        const password = e.target['login-password'].value;
+        const loginErrorEl = document.getElementById('login-error');
+        if (loginErrorEl) loginErrorEl.textContent = '';
+        try {
+            await auth.signInWithEmailAndPassword(email, password);
+        } catch (error) {
+            if (loginErrorEl) loginErrorEl.textContent = getFirebaseAuthErrorMessage(error);
+        }
+    });
+}
+
+function renderSignupForm() {
+    if (!loginFormContainer) return;
+    if (authTitle) authTitle.textContent = 'Crear Nueva Cuenta';
+    loginFormContainer.innerHTML = `
+        <form id="signup-form" class="space-y-3">
+            <div><label for="signup-nombre" class="block text-sm font-medium text-nova-gray-dark">Nombre(s)</label><input type="text" id="signup-nombre" name="nombre" required autocomplete="given-name" class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"></div>
+            <div><label for="signup-apellidos" class="block text-sm font-medium text-nova-gray-dark">Apellidos</label><input type="text" id="signup-apellidos" name="apellidos" required autocomplete="family-name" class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"></div>
+            <div><label for="signup-cedula" class="block text-sm font-medium text-nova-gray-dark">Número de Cédula</label><input type="text" id="signup-cedula" name="cedula" required class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"></div>
+            <div><label for="signup-email" class="block text-sm font-medium text-nova-gray-dark">Correo Electrónico</label><input type="email" id="signup-email" name="email" required autocomplete="email" class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"></div>
+            <div><label for="signup-password" class="block text-sm font-medium text-nova-gray-dark">Contraseña</label><input type="password" id="signup-password" name="password" required autocomplete="new-password" class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"></div>
+            <div><label for="signup-confirm-password" class="block text-sm font-medium text-nova-gray-dark">Confirmar Contraseña</label><input type="password" id="signup-confirm-password" name="confirm-password" required autocomplete="new-password" class="mt-1 block w-full px-3 py-2 border border-nova-gray rounded-md shadow-sm focus:outline-none focus:ring-nova-green focus:border-nova-green sm:text-sm"></div>
+            <div class="text-xs text-nova-gray-dark">La contraseña debe tener al menos 12 caracteres e incluir al menos uno de los siguientes símbolos: & % # "</div>
+            <div class="pt-2 flex items-start"><div class="flex items-center h-5"><input id="data-consent" name="dataConsent" type="checkbox" required class="focus:ring-nova-green h-4 w-4 text-nova-green border-gray-300 rounded"></div><div class="ml-3 text-sm"><label for="data-consent" class="font-medium text-nova-gray-dark">Acepto que mis datos sean tratados de acuerdo con la Ley de Protección de Datos de Colombia (Ley 1581 de 2012) y la Política de Tratamiento de Datos de Nova Urbano.</label></div></div>
+            
+            <div class="text-center my-4 p-3 bg-gray-50 rounded-md border">
+                <p class="text-sm font-medium text-nova-gray-dark mb-2">Verificación de Seguridad</p>
+                <div id="signup-turnstile-container" class="flex justify-center"></div>
+                <p class="text-xs text-nova-gray mt-2">Realice la verificación para poder registrarse.</p>
+            </div>
+            <div class="pt-2">
+                <button type="submit" id="signup-submit-button" disabled class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-nova-green hover:bg-nova-green-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nova-green-dark transition-colors duration-150 disabled:bg-nova-gray disabled:cursor-not-allowed">
+                    Registrarse
+                </button>
+            </div>
+        </form>
+        <p id="signup-error" class="mt-2 text-center text-sm text-red-600"></p>
+    `;
+
+    if (registrationArea) {
+        registrationArea.innerHTML = `<p class="text-sm text-nova-gray-dark">¿Ya tienes cuenta? <a href="#" id="show-login-link" class="font-medium text-nova-green hover:text-nova-green-dark">Inicia sesión aquí</a></p>`;
+        document.getElementById('show-login-link').addEventListener('click', (e) => {
+            e.preventDefault();
+            renderLoginForm();
+        });
+    }
+    
+    function renderWidget() {
+        if (typeof turnstile !== 'undefined') {
+            turnstile.render('#signup-turnstile-container', {
+                sitekey: '%TURNSTILE_SITEKEY%',
+                language: 'es', // Set to Spanish
+                theme: 'dark',   // Or 'dark'
+                callback: function(token) {
+                    const button = document.getElementById('signup-submit-button');
+                    if(button) {
+                       button.disabled = false;
+                    }
+                },
+            });
+        }
+    }
+
+    if (window.turnstileLoaded) {
+        renderWidget();
+    } else {
+        const interval = setInterval(() => {
+            if (window.turnstileLoaded) {
+                renderWidget();
+                clearInterval(interval);
+            }
+        }, 100);
+    }
+
+    document.getElementById('signup-form').addEventListener('submit', handleSignupSubmit);
+}
 
     function getFirebaseAuthErrorMessage(error) {
         switch (error.code) {
