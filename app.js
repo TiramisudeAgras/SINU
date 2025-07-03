@@ -28,6 +28,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let showZeroQuantityItems = false;
     let currentSiteFilter = 'all'; // <-- ADD THIS LINE
 
+    let currentInventoryCache = [];
+    let sortColumn = 'itemName';
+    let sortDirection = 'asc';
+
     // --- DOM Element References ---
     const authSection = document.getElementById('auth-section');
     const authTitle = document.getElementById('auth-title');
@@ -689,184 +693,214 @@ function renderSignupForm() {
     }
 
     async function loadInventoryItems(siteId, siteName) {
-        if (!inventoryListContainer) {
-            return;
-        }
-        // Switched to table view
-        inventoryListContainer.innerHTML = `
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ítem</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unidad</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Serial/Modelo</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                        <th scope="col" class="relative px-6 py-3"><span class="sr-only">Acciones</span></th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    <tr><td colspan="6" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Cargando inventario para ${siteName}...</td></tr>
-                </tbody>
-            </table>`;
+    // Set up the static table structure first
+    inventoryListContainer.innerHTML = `
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sortable-header" data-sort="itemName" style="cursor: pointer;">Ítem <span class="sort-indicator"></span></th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sortable-header" data-sort="quantity" style="cursor: pointer;">Cantidad <span class="sort-indicator"></span></th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unidad</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Serial/Modelo</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sortable-header" data-sort="condition" style="cursor: pointer;">Estado <span class="sort-indicator"></span></th>
+                    <th scope="col" class="relative px-6 py-3"><span class="sr-only">Acciones</span></th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                <tr><td colspan="6" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Cargando inventario para ${siteName}...</td></tr>
+            </tbody>
+        </table>`;
 
-        const tableBody = inventoryListContainer.querySelector('tbody');
-        if (!tableBody) return;
+    // Attach click listeners to the newly created headers
+    document.querySelectorAll('.sortable-header').forEach(header => {
+        header.addEventListener('click', () => {
+            sortInventory(header.dataset.sort);
+        });
+    });
 
-        const user = auth.currentUser;
-        if (!user) {
-            tableBody.innerHTML = '<tr><td colspan="6" class="px-6 py-4 whitespace-nowrap text-sm text-red-500">Error: Usuario no autenticado.</td></tr>';
-            return;
-        }
+    const tableBody = inventoryListContainer.querySelector('tbody');
+    const user = auth.currentUser;
+    if (!user) {
+        tableBody.innerHTML = '<tr><td colspan="6" class="px-6 py-4 whitespace-nowrap text-sm text-red-500">Error: Usuario no autenticado.</td></tr>';
+        return;
+    }
 
-        try {
-            const inventorySnapshot = await db.collection("inventoryItems")
-                .where("siteId", "==", siteId)
-                .orderBy("itemName", "asc")
-                .get();
+    try {
+        const inventorySnapshot = await db.collection("inventoryItems")
+            .where("siteId", "==", siteId)
+            .get();
 
-            let itemsHTML = '';
-            let itemsToDisplay = 0;
+        // Clear previous cache and reset sorting state for the new site
+        currentInventoryCache = [];
+        sortColumn = 'itemName';
+        sortDirection = 'asc';
 
-            inventorySnapshot.forEach(doc => {
-                const item = doc.data();
-                const itemId = doc.id;
+        inventorySnapshot.forEach(doc => {
+            currentInventoryCache.push({ id: doc.id, ...doc.data() });
+        });
+        
+        // Perform the initial sort by the default column (itemName)
+        sortInventory(sortColumn, true);
 
-                if (item.quantity === 0 && !showZeroQuantityItems) {
-                    return;
-                }
-                itemsToDisplay++;
-
-                const escapedItemName = item.itemName ? item.itemName.replace(/[&<>"']/g, char => ({
-                    '&': '&amp;',
-                    '<': '&lt;',
-                    '>': '&gt;',
-                    '"': '&quot;',
-                    "'": '&#39;'
-                } [char])) : 'Ítem sin nombre';
-                const escapedUnit = item.unit ? item.unit.replace(/[&<>"']/g, char => ({
-                    '&': '&amp;',
-                    '<': '&lt;',
-                    '>': '&gt;',
-                    '"': '&quot;',
-                    "'": '&#39;'
-                } [char])) : '';
-                const escapedSerialModel = item.serialModel ? item.serialModel.replace(/[&<>"']/g, char => ({
-                    '&': '&amp;',
-                    '<': '&lt;',
-                    '>': '&gt;',
-                    '"': '&quot;',
-                    "'": '&#39;'
-                } [char])) : 'N/A';
-                const escapedCondition = item.condition ? item.condition.replace(/[&<>"']/g, char => ({
-                    '&': '&amp;',
-                    '<': '&lt;',
-                    '>': '&gt;',
-                    '"': '&quot;',
-                    "'": '&#39;'
-                } [char])) : 'N/A';
-                const zeroQtyClass = item.quantity === 0 ? 'opacity-60' : '';
-
-                itemsHTML += `
-                    <tr class="${zeroQtyClass}" data-item-id="${itemId}">
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm font-medium text-gray-900">${escapedItemName}</div>
-                            <div class="text-xs text-gray-500">NUI: ${item.nui || 'N/A'}</div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.quantity !== undefined ? item.quantity : 'N/A'}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${escapedUnit}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${escapedSerialModel}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${escapedCondition}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <div class="flex space-x-2">
-                                ${currentUserRole === 'oficina' ? `
-                                    <button class="edit-item-btn text-xs bg-blue-500 hover:bg-blue-600 text-white py-1 px-2 rounded" data-item-id="${itemId}" data-site-id="${siteId}" data-site-name="${siteName}">Editar</button>
-                                    <button class="adjust-quantity-btn text-xs bg-green-500 hover:bg-green-600 text-white py-1 px-2 rounded" data-item-id="${itemId}" data-site-id="${siteId}" data-site-name="${siteName}" data-item-name="${escapedItemName}" data-current-quantity="${item.quantity}">Ajustar Cant.</button>
-                                    <button class="transfer-item-btn text-xs bg-yellow-500 hover:bg-yellow-600 text-black py-1 px-2 rounded" data-item-id="${itemId}" data-site-id="${siteId}" data-site-name="${siteName}">Transferir</button>
-                                ` : ''}
-                                <button class="view-history-btn text-xs bg-gray-400 hover:bg-gray-500 text-white py-1 px-2 rounded" data-item-id="${itemId}" data-item-name="${escapedItemName}">Historial</button>
-                                <button class="maintenance-log-btn text-xs bg-orange-500 hover:bg-orange-600 text-white py-1 px-2 rounded" data-item-id="${itemId}" data-item-name="${escapedItemName}" data-site-id="${siteId}" data-site-name="${siteName}">Bitácora</button>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            });
-
-            if (inventorySnapshot.empty || itemsToDisplay === 0) {
-                let noItemsMessage = `<tr><td colspan="6" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">No hay ítems de inventario para esta ubicación (${siteName}).</td></tr>`;
-                if (!inventorySnapshot.empty && itemsToDisplay === 0) {
-                    noItemsMessage = `<tr><td colspan="6" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Todos los ítems tienen cantidad cero. Active "Mostrar ítems sin stock" para verlos.</td></tr>`;
-                }
-                tableBody.innerHTML = noItemsMessage;
-            } else {
-                tableBody.innerHTML = itemsHTML;
-            }
-
-            // Re-attach event listeners
-            if (currentUserRole === 'oficina') {
-                document.querySelectorAll('.edit-item-btn').forEach(button => {
-                    button.addEventListener('click', async (e) => {
-                        const itemId = e.target.dataset.itemId;
-                        const siteId = e.target.dataset.siteId;
-                        const siteName = e.target.dataset.siteName;
-                        try {
-                            const itemDoc = await db.collection("inventoryItems").doc(itemId).get();
-                            if (itemDoc.exists) renderEditItemForm(itemId, itemDoc.data(), siteId, siteName);
-                            else alert("Error: Ítem no encontrado.");
-                        } catch (error) {
-                            alert("Error al cargar datos del ítem para editar.");
-                        }
-                    });
-                });
-                document.querySelectorAll('.adjust-quantity-btn').forEach(button => {
-                    button.addEventListener('click', (e) => {
-                        const itemId = e.target.dataset.itemId;
-                        const siteId = e.target.dataset.siteId;
-                        const siteName = e.target.dataset.siteName;
-                        const itemName = e.target.dataset.itemName;
-                        const currentQuantity = parseFloat(e.target.dataset.currentQuantity);
-                        renderAdjustQuantityForm(itemId, itemName, currentQuantity, siteId, siteName);
-                    });
-                });
-                document.querySelectorAll('.transfer-item-btn').forEach(button => {
-                    button.addEventListener('click', async (e) => {
-                        const itemId = e.target.dataset.itemId;
-                        const siteId = e.target.dataset.siteId;
-                        const siteName = e.target.dataset.siteName;
-                        try {
-                            const itemDoc = await db.collection("inventoryItems").doc(itemId).get();
-                            if (itemDoc.exists) renderTransferItemForm(itemId, itemDoc.data(), siteId, siteName);
-                            else alert("Error: Ítem no encontrado.");
-                        } catch (error) {
-                            alert("Error al cargar datos del ítem para transferir.");
-                        }
-                    });
-                });
-            }
-            document.querySelectorAll('.view-history-btn').forEach(button => {
-                button.addEventListener('click', (e) => {
-                    const itemId = e.target.dataset.itemId;
-                    const itemName = e.target.dataset.itemName;
-                    showItemHistory(itemId, itemName);
-                });
-            });
-
-            document.querySelectorAll('.maintenance-log-btn').forEach(button => {
-                button.addEventListener('click', (e) => {
-                    const itemId = e.target.dataset.itemId;
-                    const itemName = e.target.dataset.itemName;
-                    const siteId = e.target.dataset.siteId;
-                    const siteName = e.target.dataset.siteName;
-                    showMaintenanceLog(itemId, itemName, siteId, siteName);
-                });
-            });
-        } catch (error) {
-            tableBody.innerHTML = `<tr><td colspan="6" class="px-6 py-4 whitespace-nowrap text-sm text-red-500">Error al cargar el inventario: ${error.message}.</td></tr>`;
-            if (error.message.includes("index")) {
-                tableBody.innerHTML += `<tr><td colspan="6" class="px-6 py-4 whitespace-nowrap text-sm text-red-400">Es posible que necesite crear un índice compuesto en Firestore.</td></tr>`;
-            }
+    } catch (error) {
+        tableBody.innerHTML = `<tr><td colspan="6" class="px-6 py-4 whitespace-nowrap text-sm text-red-500">Error al cargar el inventario: ${error.message}.</td></tr>`;
+        if (error.message.includes("index")) {
+            tableBody.innerHTML += `<tr><td colspan="6" class="px-6 py-4 whitespace-nowrap text-sm text-red-400">Es posible que necesite crear un índice compuesto en Firestore.</td></tr>`;
         }
     }
+}
+
+
+/**
+ * NEW function to handle sorting the cached data.
+ */
+function sortInventory(column, initializing = false) {
+    if (!initializing) {
+        if (column === sortColumn) {
+            sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            sortColumn = column;
+            sortDirection = 'asc';
+        }
+    }
+
+    currentInventoryCache.sort((a, b) => {
+        let valA, valB;
+
+        if (sortColumn === 'quantity') {
+            valA = a.quantity !== undefined ? a.quantity : -1;
+            valB = b.quantity !== undefined ? b.quantity : -1;
+        } else {
+            valA = (a[sortColumn] || '').toLowerCase();
+            valB = (b[sortColumn] || '').toLowerCase();
+        }
+
+        let comparison = 0;
+        if (valA > valB) comparison = 1;
+        else if (valA < valB) comparison = -1;
+
+        return sortDirection === 'asc' ? comparison : comparison * -1;
+    });
+
+    renderInventoryTable(currentInventoryCache);
+}
+
+
+/**
+ * NEW function that only renders the table from the cached data.
+ */
+function renderInventoryTable(items) {
+    const tableBody = inventoryListContainer.querySelector('tbody');
+    if (!tableBody) return;
+
+    document.querySelectorAll('.sort-indicator').forEach(el => el.textContent = '');
+    const activeHeader = document.querySelector(`.sortable-header[data-sort="${sortColumn}"] .sort-indicator`);
+    if (activeHeader) {
+        activeHeader.textContent = sortDirection === 'asc' ? ' ▲' : ' ▼';
+    }
+
+    const itemsToDisplay = items.filter(item => showZeroQuantityItems || item.quantity > 0);
+
+    if (itemsToDisplay.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="6" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">No hay ítems para mostrar.</td></tr>`;
+        return;
+    }
+
+    const siteName = inventorySection.dataset.currentSiteName;
+    const itemsHTML = itemsToDisplay.map(item => {
+        const escapedItemName = item.itemName ? item.itemName.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])) : 'Ítem sin nombre';
+        const escapedUnit = item.unit ? item.unit.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])) : '';
+        const escapedSerialModel = item.serialModel ? item.serialModel.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])) : 'N/A';
+        const escapedCondition = item.condition ? item.condition.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])) : 'N/A';
+        const zeroQtyClass = item.quantity === 0 ? 'opacity-60' : '';
+
+        return `
+            <tr class="${zeroQtyClass}" data-item-id="${item.id}">
+                <td class="px-6 py-4 whitespace-nowrap"><div class="text-sm font-medium text-gray-900">${escapedItemName}</div><div class="text-xs text-gray-500">NUI: ${item.nui || 'N/A'}</div></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.quantity !== undefined ? item.quantity : 'N/A'}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${escapedUnit}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${escapedSerialModel}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${escapedCondition}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <div class="flex space-x-2">
+                        ${currentUserRole === 'oficina' ? `
+                            <button class="edit-item-btn text-xs bg-blue-500 hover:bg-blue-600 text-white py-1 px-2 rounded" data-item-id="${item.id}" data-site-id="${item.siteId}" data-site-name="${siteName}">Editar</button>
+                            <button class="adjust-quantity-btn text-xs bg-green-500 hover:bg-green-600 text-white py-1 px-2 rounded" data-item-id="${item.id}" data-site-id="${item.siteId}" data-site-name="${siteName}" data-item-name="${escapedItemName}" data-current-quantity="${item.quantity}">Ajustar Cant.</button>
+                            <button class="transfer-item-btn text-xs bg-yellow-500 hover:bg-yellow-600 text-black py-1 px-2 rounded" data-item-id="${item.id}" data-site-id="${item.siteId}" data-site-name="${siteName}">Transferir</button>
+                        ` : ''}
+                        <button class="view-history-btn text-xs bg-gray-400 hover:bg-gray-500 text-white py-1 px-2 rounded" data-item-id="${item.id}" data-item-name="${escapedItemName}">Historial</button>
+                        <button class="maintenance-log-btn text-xs bg-orange-500 hover:bg-orange-600 text-white py-1 px-2 rounded" data-item-id="${item.id}" data-item-name="${escapedItemName}" data-site-id="${item.siteId}" data-site-name="${siteName}">Bitácora</button>
+                    </div>
+                </td>
+            </tr>`;
+    }).join('');
+
+    tableBody.innerHTML = itemsHTML;
+    attachInventoryButtonListeners();
+}
+
+
+/**
+ * NEW function to centralize attaching listeners to the dynamic buttons in the table.
+ */
+function attachInventoryButtonListeners() {
+    if (currentUserRole === 'oficina') {
+        document.querySelectorAll('.edit-item-btn').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const itemId = e.target.dataset.itemId;
+                const siteId = e.target.dataset.siteId;
+                const siteName = e.target.dataset.siteName;
+                try {
+                    const itemDoc = await db.collection("inventoryItems").doc(itemId).get();
+                    if (itemDoc.exists) renderEditItemForm(itemId, itemDoc.data(), siteId, siteName);
+                    else alert("Error: Ítem no encontrado.");
+                } catch (error) {
+                    alert("Error al cargar datos del ítem para editar.");
+                }
+            });
+        });
+        document.querySelectorAll('.adjust-quantity-btn').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const itemId = e.target.dataset.itemId;
+                const siteId = e.target.dataset.siteId;
+                const siteName = e.target.dataset.siteName;
+                const itemName = e.target.dataset.itemName;
+                const currentQuantity = parseFloat(e.target.dataset.currentQuantity);
+                renderAdjustQuantityForm(itemId, itemName, currentQuantity, siteId, siteName);
+            });
+        });
+        document.querySelectorAll('.transfer-item-btn').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const itemId = e.target.dataset.itemId;
+                const siteId = e.target.dataset.siteId;
+                const siteName = e.target.dataset.siteName;
+                try {
+                    const itemDoc = await db.collection("inventoryItems").doc(itemId).get();
+                    if (itemDoc.exists) renderTransferItemForm(itemId, itemDoc.data(), siteId, siteName);
+                    else alert("Error: Ítem no encontrado.");
+                } catch (error) {
+                    alert("Error al cargar datos del ítem para transferir.");
+                }
+            });
+        });
+    }
+    document.querySelectorAll('.view-history-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+            const itemId = e.target.dataset.itemId;
+            const itemName = e.target.dataset.itemName;
+            showItemHistory(itemId, itemName);
+        });
+    });
+    document.querySelectorAll('.maintenance-log-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+            const itemId = e.target.dataset.itemId;
+            const itemName = e.target.dataset.itemName;
+            const siteId = e.target.dataset.siteId;
+            const siteName = e.target.dataset.siteName;
+            showMaintenanceLog(itemId, itemName, siteId, siteName);
+        });
+    });
+}
 
     async function exportInventoryToCsv() {
     const siteId = inventorySection.dataset.currentSiteId;
